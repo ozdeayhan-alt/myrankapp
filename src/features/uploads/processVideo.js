@@ -14,7 +14,9 @@ const {
   uploadLocalFile,
   uploadDirectory,
   getObjectDownloadURL,
+  getBucketName,
 } = require("../../lib/storageMedia");
+const { rewriteHlsPlaylistAbsolute } = require("../../lib/hlsPlaylist");
 
 function hlsContentType(ext) {
   if (ext === ".m3u8") return "application/vnd.apple.mpegurl";
@@ -52,6 +54,15 @@ async function processVideoUpload(storagePath) {
     await transcodeToFastStartMp4(workingInput, fastPath);
     await transcodeToHls(workingInput, hlsDir);
 
+    await transcodeToHls(workingInput, hlsDir);
+
+    const bucket = getBucketName();
+    const hlsURL = rewriteHlsPlaylistAbsolute(
+      path.join(hlsDir, "master.m3u8"),
+      hlsPrefix,
+      bucket
+    );
+
     try {
       await extractPosterJpeg(workingInput, posterLocalPath);
     } catch (error) {
@@ -67,8 +78,7 @@ async function processVideoUpload(storagePath) {
       contentTypeForExt: hlsContentType,
     });
 
-    const hlsURL = uploaded["master.m3u8"];
-    if (!hlsURL) {
+    if (!uploaded["master.m3u8"]) {
       throw new Error("HLS playlist upload failed");
     }
 
