@@ -1,0 +1,122 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function metadataComplete(data) {
+      return data.keys().hasAll([
+        'country', 'city', 'gender', 'age', 'profession', 'maritalStatus'
+      ])
+      && data.country is string && data.country.size() > 0
+      && data.city is string && data.city.size() > 0
+      && data.gender is string && data.gender.size() > 0
+      && data.age is number && data.age > 0
+      && data.profession is string && data.profession.size() > 0
+      && data.maritalStatus is string && data.maritalStatus.size() > 0;
+    }
+
+    match /publicProfiles/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isOwner(userId)
+        && request.resource.data.totalScore == 0
+        && metadataComplete(request.resource.data.metadata);
+      allow update: if isOwner(userId)
+        && request.resource.data.totalScore == resource.data.totalScore
+        && metadataComplete(request.resource.data.metadata);
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId)
+        && request.resource.data.keys().hasAll(['email', 'metadata', 'totalScore'])
+        && request.resource.data.totalScore == 0
+        && metadataComplete(request.resource.data.metadata);
+      allow update: if isOwner(userId)
+        && request.resource.data.totalScore == resource.data.totalScore
+        && metadataComplete(request.resource.data.metadata);
+
+      match /notifications/{notificationId} {
+        allow read: if isOwner(userId);
+        allow write: if false;
+      }
+
+      match /inbox/{conversationId} {
+        allow read: if isOwner(userId);
+        allow write: if false;
+      }
+
+      match /pushTokens/{tokenId} {
+        allow read: if isOwner(userId);
+        allow write: if false;
+      }
+    }
+
+    match /posts/{postId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+        && request.resource.data.authorId == request.auth.uid
+        && request.resource.data.postScore == 0;
+      allow update: if false;
+    }
+
+    match /interactions/{interactionId} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
+    match /actorEngagements/{engagementId} {
+      allow read: if isSignedIn() && resource.data.actorId == request.auth.uid;
+      allow write: if false;
+    }
+
+    match /actorCombo/{comboId} {
+      allow read: if isSignedIn() && resource.data.actorId == request.auth.uid;
+      allow write: if false;
+    }
+
+    match /rankings/{segmentKey}/entries/{userId} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
+    match /rankingSnapshots/{docId} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
+    match /follows/{followId} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
+    match /blocks/{blockId} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
+    match /reports/{reportId} {
+      allow read, write: if false;
+    }
+
+    match /conversations/{conversationId} {
+      allow read: if isSignedIn()
+        && request.auth.uid in resource.data.participantIds;
+
+      allow write: if false;
+
+      match /messages/{messageId} {
+        allow read: if isSignedIn()
+          && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds;
+        allow write: if false;
+      }
+    }
+  }
+}

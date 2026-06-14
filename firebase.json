@@ -1,0 +1,16 @@
+{
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "storage": [
+    {
+      "bucket": "myrankapp-d62b9.firebasestorage.app",
+      "rules": "storage.rules"
+    },
+    {
+      "bucket": "myrank-d62b9-storage",
+      "rules": "storage.rules"
+    }
+  ]
+}

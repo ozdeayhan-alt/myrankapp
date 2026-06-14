@@ -1,5 +1,8 @@
 require("dotenv").config();
 
+const { configureNetworkDns } = require("./src/lib/configureNetworkDns");
+configureNetworkDns();
+
 const fs = require("fs");
 const path = require("path");
 const admin = require("firebase-admin");
@@ -25,6 +28,9 @@ if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
     databaseURL: process.env.FIREBASE_DATABASE_URL,
+    storageBucket:
+      process.env.FIREBASE_STORAGE_BUCKET ||
+        "myrankapp-d62b9.firebasestorage.app",
   });
 }
 
