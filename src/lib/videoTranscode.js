@@ -66,7 +66,7 @@ async function transcodeToHls(inputPath, outputDir) {
     "-f",
     "hls",
     "-hls_time",
-    "2",
+    "1",
     "-hls_list_size",
     "0",
     "-hls_segment_type",
