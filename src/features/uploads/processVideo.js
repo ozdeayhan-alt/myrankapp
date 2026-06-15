@@ -16,7 +16,10 @@ const {
   getObjectDownloadURL,
   getBucketName,
 } = require("../../lib/storageMedia");
-const { rewriteHlsPlaylistAbsolute } = require("../../lib/hlsPlaylist");
+const {
+  buildPublicFirebaseMediaUrl,
+  rewriteHlsPlaylistAbsolute,
+} = require("../../lib/hlsPlaylist");
 
 function hlsContentType(ext) {
   if (ext === ".m3u8") return "application/vnd.apple.mpegurl";
@@ -32,6 +35,35 @@ function deriveProcessedPaths(storagePath) {
   const fastPath = `${dir}/${baseName}_fast.mp4`;
   const posterPath = `${dir}/${baseName}_poster.jpg`;
   return { hlsPrefix, fastPath, posterPath };
+}
+
+async function tryExtractPoster(inputPath, outputPath) {
+  try {
+    await extractPosterJpeg(inputPath, outputPath);
+    return fs.existsSync(outputPath);
+  } catch (error) {
+    console.warn(
+      "[processVideoUpload] poster extract failed:",
+      summarizeFfmpegError(error.message)
+    );
+    return false;
+  }
+}
+
+async function resolvePosterUrl(posterPath, posterLocalPath, bucket) {
+  if (fs.existsSync(posterLocalPath)) {
+    try {
+      return await uploadLocalFile({
+        objectPath: posterPath,
+        localPath: posterLocalPath,
+        contentType: "image/jpeg",
+      });
+    } catch (error) {
+      console.warn("[processVideoUpload] poster upload failed:", error.message);
+    }
+  }
+
+  return buildPublicFirebaseMediaUrl(bucket, posterPath);
 }
 
 async function processVideoUpload(storagePath) {
@@ -54,8 +86,6 @@ async function processVideoUpload(storagePath) {
     await transcodeToFastStartMp4(workingInput, fastPath);
     await transcodeToHls(workingInput, hlsDir);
 
-    await transcodeToHls(workingInput, hlsDir);
-
     const bucket = getBucketName();
     const hlsURL = rewriteHlsPlaylistAbsolute(
       path.join(hlsDir, "master.m3u8"),
@@ -63,13 +93,9 @@ async function processVideoUpload(storagePath) {
       bucket
     );
 
-    try {
-      await extractPosterJpeg(workingInput, posterLocalPath);
-    } catch (error) {
-      console.warn(
-        "[processVideoUpload] poster extract failed:",
-        summarizeFfmpegError(error.message)
-      );
+    let hasPoster = await tryExtractPoster(workingInput, posterLocalPath);
+    if (!hasPoster) {
+      hasPoster = await tryExtractPoster(fastPath, posterLocalPath);
     }
 
     const uploaded = await uploadDirectory({
@@ -88,18 +114,9 @@ async function processVideoUpload(storagePath) {
       contentType: "video/mp4",
     });
 
-    let posterURL;
-    if (fs.existsSync(posterLocalPath)) {
-      try {
-        posterURL = await uploadLocalFile({
-          objectPath: posterPath,
-          localPath: posterLocalPath,
-          contentType: "image/jpeg",
-        });
-      } catch (error) {
-        console.warn("[processVideoUpload] poster upload failed:", error.message);
-      }
-    }
+    const posterURL = hasPoster
+      ? await resolvePosterUrl(posterPath, posterLocalPath, bucket)
+      : undefined;
 
     return { hlsURL, mediaURL, hlsPrefix, posterURL, skipped: false };
   } finally {
