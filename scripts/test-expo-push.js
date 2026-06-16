@@ -6,23 +6,23 @@
 require("dotenv").config();
 
 const { db } = require("../src/lib/firestore");
-const { listPushTokens } = require("../src/features/push/pushTokenService");
+const { getLatestPushToken } = require("../src/features/push/pushTokenService");
 const { sendExpoPushBatch } = require("../src/features/push/sendExpoPush");
 
 async function findUserWithToken(explicitUserId) {
   if (explicitUserId) {
-    const tokens = await listPushTokens(explicitUserId);
-    if (!tokens.length) {
+    const token = await getLatestPushToken(explicitUserId);
+    if (!token) {
       throw new Error(`Kullanıcıda push token yok: ${explicitUserId}`);
     }
-    return { userId: explicitUserId, token: tokens[0] };
+    return { userId: explicitUserId, token };
   }
 
   const usersSnap = await db.collection("users").limit(100).get();
   for (const doc of usersSnap.docs) {
-    const tokens = await listPushTokens(doc.id);
-    if (tokens.length) {
-      return { userId: doc.id, token: tokens[0] };
+    const token = await getLatestPushToken(doc.id);
+    if (token) {
+      return { userId: doc.id, token };
     }
   }
 
@@ -34,7 +34,7 @@ async function main() {
   const { userId, token } = await findUserWithToken(userIdArg);
 
   console.log(`[test-push] userId=${userId}`);
-  console.log(`[test-push] token=${token.slice(0, 28)}...`);
+  console.log(`[test-push] latest token=${token.slice(0, 28)}...`);
 
   const result = await sendExpoPushBatch([
     {
