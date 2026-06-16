@@ -1,5 +1,6 @@
 const express = require("express");
 const { verifyAuth } = require("../../../lib/verifyAuth");
+const { writeRateLimit } = require("../../../lib/rateLimit");
 const {
   applyInteraction,
   getEngagementStatus,
@@ -21,6 +22,7 @@ const {
 } = require("../../notifications/createNotification");
 
 const router = express.Router();
+router.use(writeRateLimit);
 
 function fireNotification(promise) {
   void promise.catch((err) => {

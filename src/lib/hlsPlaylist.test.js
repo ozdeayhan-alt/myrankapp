@@ -1,3 +1,5 @@
+const { describe, it } = require("node:test");
+const assert = require("node:assert/strict");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
@@ -8,12 +10,11 @@ const {
 
 describe("hlsPlaylist", () => {
   it("builds public firebase media url without token", () => {
-    expect(
+    assert.equal(
       buildPublicFirebaseMediaUrl(
         "myrankapp-d62b9.firebasestorage.app",
         "posts/u1/v_hls/seg_000.ts"
-      )
-    ).toBe(
+      ),
       "https://firebasestorage.googleapis.com/v0/b/myrankapp-d62b9.firebasestorage.app/o/posts%2Fu1%2Fv_hls%2Fseg_000.ts?alt=media"
     );
   });
@@ -33,10 +34,11 @@ describe("hlsPlaylist", () => {
     );
 
     const content = fs.readFileSync(playlistPath, "utf8");
-    expect(content).toContain(
-      "https://firebasestorage.googleapis.com/v0/b/myrankapp-d62b9.firebasestorage.app/o/posts%2Fu1%2Fv_hls%2Fseg_000.ts?alt=media"
+    assert.match(
+      content,
+      /https:\/\/firebasestorage\.googleapis\.com\/v0\/b\/myrankapp-d62b9\.firebasestorage\.app\/o\/posts%2Fu1%2Fv_hls%2Fseg_000\.ts\?alt=media/
     );
-    expect(hlsUrl).toContain("master.m3u8?alt=media");
+    assert.match(hlsUrl, /master\.m3u8\?alt=media/);
     fs.rmSync(tmp, { recursive: true, force: true });
   });
 });

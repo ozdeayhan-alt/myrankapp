@@ -12,5 +12,8 @@ service-account.json
 npm-debug.log*
 logs/
 
+# Release binaries
+public/myrank-release.aab
+
 # OS files
 .DS_Store

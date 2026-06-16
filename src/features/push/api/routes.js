@@ -1,11 +1,13 @@
 const express = require("express");
 const { verifyAuth } = require("../../../lib/verifyAuth");
+const { writeRateLimit } = require("../../../lib/rateLimit");
 const {
   registerPushToken,
   unregisterPushToken,
 } = require("../pushTokenService");
 
 const router = express.Router();
+router.use(writeRateLimit);
 
 router.post("/push/register", verifyAuth, async (req, res) => {
   try {

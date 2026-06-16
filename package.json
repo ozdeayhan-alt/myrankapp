@@ -6,17 +6,21 @@
   "scripts": {
     "start": "node index.js",
     "dev": "node --watch index.js",
+    "test": "node --test src/lib/hlsPlaylist.test.js",
+    "check": "npm test && node --check index.js",
+    "test-push": "node scripts/test-expo-push.js",
     "rebuild-rankings": "node scripts/rebuild-rankings.js",
     "seed-bots": "node scripts/seed-bots.js",
     "run-bot-jobs": "node scripts/run-bot-jobs.js",
     "backfill-display-name-lower": "node scripts/backfill-display-name-lower.js",
+    "backfill-photo-urls": "node scripts/backfill-photo-urls.js",
+    "repair-profile-photos": "node scripts/repair-profile-photos.js",
     "backfill-user-feeds": "node scripts/backfill-user-feeds.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@tanstack/react-query": "^5.100.14",
     "dotenv": "^16.4.5",
     "express": "^4.21.2",
     "firebase-admin": "^13.0.2"

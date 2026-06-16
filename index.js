@@ -36,6 +36,11 @@ const pushRoutes = require("./src/features/push/api/routes");
 const blocksRoutes = require("./src/features/blocks/api/routes");
 const accountRoutes = require("./src/features/account/api/routes");
 const { registerLegalRoutes } = require("./src/legal/routes");
+const {
+  apiRateLimit,
+  writeRateLimit,
+  uploadRateLimit,
+} = require("./src/lib/rateLimit");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -43,6 +48,7 @@ const API_TIMEOUT_MS = Number(process.env.API_TIMEOUT_MS) || 25000;
 
 app.use(express.json({ limit: "25mb" }));
 
+app.use("/api", apiRateLimit);
 app.use("/api", (req, res, next) => {
   res.setTimeout(API_TIMEOUT_MS, () => {
     if (!res.headersSent) {

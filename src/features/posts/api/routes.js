@@ -1,5 +1,6 @@
 const express = require("express");
 const { verifyAuth } = require("../../../lib/verifyAuth");
+const { writeRateLimit } = require("../../../lib/rateLimit");
 const { deletePost } = require("../deletePost");
 const { updatePostContent } = require("../updatePostContent");
 const { repostPost } = require("../repostPost");
@@ -14,6 +15,7 @@ const { fetchPostById } = require("../../profile/fetchProfileSummary");
 const { invalidateFeedCachesForPost } = require("../../feed/feedCache");
 
 const router = express.Router();
+router.use(writeRateLimit);
 
 router.post("/posts/mentions/resolve", verifyAuth, async (req, res) => {
   try {

@@ -1,5 +1,6 @@
 const express = require("express");
 const { verifyAuth } = require("../../../lib/verifyAuth");
+const { uploadRateLimit } = require("../../../lib/rateLimit");
 const {
   uploadBuffer,
   createSignedUploadUrl,
@@ -14,6 +15,7 @@ const {
 const { processVideoUploadWithFallback } = require("../processVideo");
 
 const router = express.Router();
+router.use(uploadRateLimit);
 
 const STORAGE_BUCKET =
   process.env.FIREBASE_STORAGE_BUCKET ||

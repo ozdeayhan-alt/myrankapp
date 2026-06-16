@@ -1,5 +1,6 @@
 const express = require("express");
 const { verifyAuth } = require("../../../lib/verifyAuth");
+const { writeRateLimit } = require("../../../lib/rateLimit");
 const {
   openConversation,
   sendMessage,
@@ -8,6 +9,7 @@ const {
 const { mapMessageError } = require("../messageErrors");
 
 const router = express.Router();
+router.use(writeRateLimit);
 
 router.post("/messages/conversations", verifyAuth, async (req, res) => {
   try {

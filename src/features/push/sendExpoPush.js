@@ -108,6 +108,7 @@ async function sendPushForNotification({
 
 module.exports = {
   sendPushForNotification,
+  sendExpoPushBatch,
   buildPushData,
   formatPushBody,
 };
