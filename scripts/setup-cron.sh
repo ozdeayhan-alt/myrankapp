@@ -7,7 +7,9 @@ set -euo pipefail
 
 PROJECT_DIR="${PROJECT_DIR:-/root/myrankapp}"
 CRON_MARKER="myrankapp-rebuild-rankings"
+PRUNE_MARKER="myrankapp-prune-push-tokens"
 SCHEDULE="0 0 * * *"
+PRUNE_SCHEDULE="0 3 * * 0"
 
 NODE_BIN="$(command -v node || true)"
 if [[ -z "$NODE_BIN" || ! -x "$NODE_BIN" ]]; then
@@ -46,13 +48,16 @@ fi
 
 # crontab satırı (TZ satır içi; her gece 00:00 Istanbul)
 CRON_LINE="${SCHEDULE} cd ${PROJECT_DIR} && TZ=Europe/Istanbul ${NODE_BIN} scripts/rebuild-rankings.js >> ${LOG_FILE} 2>&1 # ${CRON_MARKER}"
+PRUNE_LOG="$LOG_DIR/prune-push-tokens.log"
+PRUNE_LINE="${PRUNE_SCHEDULE} cd ${PROJECT_DIR} && ${NODE_BIN} scripts/prune-push-tokens.js --all >> ${PRUNE_LOG} 2>&1 # ${PRUNE_MARKER}"
 
 EXISTING="$(crontab -l 2>/dev/null || true)"
-FILTERED="$(echo "$EXISTING" | grep -v "${CRON_MARKER}" | grep -v '^[[:space:]]*$' || true)"
+FILTERED="$(echo "$EXISTING" | grep -v "${CRON_MARKER}" | grep -v "${PRUNE_MARKER}" | grep -v '^[[:space:]]*$' || true)"
 
 {
   echo "$FILTERED"
   echo "$CRON_LINE"
+  echo "$PRUNE_LINE"
 } | crontab -
 
 echo ""
@@ -63,7 +68,8 @@ echo "  Log:    $LOG_FILE"
 echo "  Saat:   Her gün 00:00 (Europe/Istanbul)"
 echo ""
 echo "Mevcut crontab:"
-crontab -l | grep "${CRON_MARKER}" || true
+crontab -l | grep -E "${CRON_MARKER}|${PRUNE_MARKER}" || true
 echo ""
 echo "Manuel test:"
 echo "  cd ${PROJECT_DIR} && npm run rebuild-rankings"
+echo "  cd ${PROJECT_DIR} && npm run prune-push-tokens -- --all"
