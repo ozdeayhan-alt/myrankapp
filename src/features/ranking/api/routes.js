@@ -6,19 +6,20 @@ const {
   getEngagementStatus,
   getBatchEngagementStatus,
 } = require("../engine/applyInteraction");
-const { applyInteractionSession } = require("../engine/applyInteractionSession");
-const { applyLikeBonus } = require("../engine/applyLikeBonus");
-const { applyDislikeBonus } = require("../engine/applyDislikeBonus");
-const { LIKE_BONUS_TIERS } = require("../../../config/scoring");
 const {
   applyProfileVoteBatch,
   parseDelta,
   MAX_PROFILE_VOTE_DELTA,
 } = require("../engine/applyProfileVoteBatch");
+const {
+  applyPostVoteBatch,
+  MAX_POST_VOTE_DELTA,
+} = require("../engine/applyPostVoteBatch");
 const { INTERACTION_TYPES } = require("../../../config/scoring");
 const {
   notifyPostInteraction,
   notifyProfileVotes,
+  notifyPostVotes,
 } = require("../../notifications/createNotification");
 
 const router = express.Router();
@@ -120,103 +121,48 @@ router.post("/profile-votes/batch", verifyAuth, async (req, res) => {
   }
 });
 
-router.post("/interactions/like-bonus", verifyAuth, async (req, res) => {
+router.post("/post-votes/batch", verifyAuth, async (req, res) => {
   try {
-    const { postId, bonusPoints } = req.body;
+    const { postId } = req.body;
+    const delta = parseDelta(req.body);
 
     if (!postId || typeof postId !== "string") {
       return res.status(400).json({ error: "postId is required" });
     }
 
-    if (!LIKE_BONUS_TIERS.includes(bonusPoints)) {
+    if (delta === null) {
       return res.status(400).json({
-        error: `bonusPoints must be one of: ${LIKE_BONUS_TIERS.join(", ")}`,
+        error: "Provide delta (number) or up/down counts",
       });
     }
 
-    const result = await applyLikeBonus({
-      postId,
+    if (delta === 0) {
+      return res.status(400).json({ error: "delta must be non-zero" });
+    }
+
+    if (Math.abs(delta) > MAX_POST_VOTE_DELTA) {
+      return res.status(400).json({
+        error: `delta cannot exceed ${MAX_POST_VOTE_DELTA}`,
+      });
+    }
+
+    const result = await applyPostVoteBatch({
       actorId: req.user.uid,
-      bonusPoints,
-    });
-
-    res.json({ ok: true, ...result });
-  } catch (error) {
-    res.status(500).json({
-      error: error.message ?? "Like bonus failed",
-    });
-  }
-});
-
-router.post("/interactions/dislike-bonus", verifyAuth, async (req, res) => {
-  try {
-    const { postId, bonusPoints } = req.body;
-
-    if (!postId || typeof postId !== "string") {
-      return res.status(400).json({ error: "postId is required" });
-    }
-
-    if (!LIKE_BONUS_TIERS.includes(bonusPoints)) {
-      return res.status(400).json({
-        error: `bonusPoints must be one of: ${LIKE_BONUS_TIERS.join(", ")}`,
-      });
-    }
-
-    const result = await applyDislikeBonus({
       postId,
-      actorId: req.user.uid,
-      bonusPoints,
+      delta,
     });
 
-    res.json({ ok: true, ...result });
-  } catch (error) {
-    res.status(500).json({
-      error: error.message ?? "Dislike bonus failed",
-    });
-  }
-});
-
-router.post("/interactions/session", verifyAuth, async (req, res) => {
-  try {
-    const { postId, liked, disliked } = req.body;
-
-    if (!postId || typeof postId !== "string") {
-      return res.status(400).json({ error: "postId is required" });
-    }
-
-    if (typeof liked !== "boolean" || typeof disliked !== "boolean") {
-      return res.status(400).json({
-        error: "liked and disliked must be booleans",
-      });
-    }
-
-    if (liked && disliked) {
-      return res.status(400).json({
-        error: "liked and disliked cannot both be true",
-      });
-    }
-
-    const result = await applyInteractionSession({
-      postId,
-      actorId: req.user.uid,
-      liked,
-      disliked,
-    });
-
-    const actorId = req.user.uid;
     if (
-      !result.unchanged &&
+      delta > 0 &&
       result.authorId &&
-      result.authorId !== actorId &&
-      result.notifyType === "like" &&
-      result.engagement?.liked
+      result.authorId !== req.user.uid
     ) {
       fireNotification(
-        notifyPostInteraction({
+        notifyPostVotes({
           authorId: result.authorId,
-          actorId,
+          actorId: req.user.uid,
           postId,
-          type: "like",
+          delta,
         })
       );
     }
@@ -224,7 +170,7 @@ router.post("/interactions/session", verifyAuth, async (req, res) => {
     res.json({ ok: true, ...result });
   } catch (error) {
     res.status(500).json({
-      error: error.message ?? "Interaction session failed",
+      error: error.message ?? "Post vote batch failed",
     });
   }
 });
@@ -259,16 +205,7 @@ router.post("/interactions", verifyAuth, async (req, res) => {
     const actorId = req.user.uid;
     if (result.authorId && result.authorId !== actorId) {
       const { engagement, firstAction } = result;
-      if (type === "like" && engagement?.liked) {
-        fireNotification(
-          notifyPostInteraction({
-            authorId: result.authorId,
-            actorId,
-            postId,
-            type: "like",
-          })
-        );
-      } else if (type === "comment") {
+      if (type === "comment") {
         fireNotification(
           notifyPostInteraction({
             authorId: result.authorId,

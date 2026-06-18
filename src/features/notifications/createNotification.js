@@ -99,9 +99,23 @@ async function notifyProfileVotes({ targetUserId, actorId, delta }) {
   });
 }
 
+async function notifyPostVotes({ authorId, actorId, postId, delta }) {
+  if (delta <= 0) {
+    return null;
+  }
+
+  return createNotification({
+    recipientId: authorId,
+    actorId,
+    type: "post_liked",
+    payload: { postId, voteDelta: delta },
+  });
+}
+
 module.exports = {
   createNotification,
   notifyPostInteraction,
   notifyProfileVotes,
+  notifyPostVotes,
   NOTIFICATION_TYPES,
 };

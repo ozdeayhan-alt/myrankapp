@@ -12,6 +12,7 @@ const { db } = require("../src/lib/firestore");
 const {
   getRankingSegmentKeys,
   GLOBAL_RANKING_SEGMENT,
+  buildSegmentKey,
 } = require("../src/lib/segmentKey");
 const { DEFAULT_DISPLAY_NAME } = require("../src/features/ranking/engine/updateRankings");
 
@@ -45,6 +46,10 @@ async function fetchAllUsers() {
             ? data.photoURL.trim()
             : "",
         metadata: data.metadata ?? null,
+        isBot: data.isBot === true,
+        botRole: typeof data.botRole === "string" ? data.botRole : null,
+        segmentBotKey:
+          typeof data.segmentBotKey === "string" ? data.segmentBotKey : null,
       });
     });
 
@@ -77,6 +82,28 @@ function buildSegmentBuckets(users) {
       photoURL: user.photoURL,
       metadata: user.metadata,
     };
+
+    if (user.isBot && user.botRole === "segment") {
+      if (user.metadata) {
+        for (const segmentKey of getRankingSegmentKeys(user.metadata)) {
+          addToSegment(segmentKey, {
+            ...base,
+            metadata: user.metadata,
+          });
+        }
+      } else {
+        const segmentKey =
+          user.segmentBotKey ||
+          (user.metadata ? buildSegmentKey(user.metadata) : null);
+        if (segmentKey) {
+          addToSegment(segmentKey, {
+            ...base,
+            metadata: user.metadata ?? {},
+          });
+        }
+      }
+      continue;
+    }
 
     addToSegment(GLOBAL_RANKING_SEGMENT, {
       ...base,

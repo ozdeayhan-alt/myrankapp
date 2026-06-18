@@ -3,7 +3,29 @@
  * Suitable for single-instance PM2; resets on process restart.
  */
 
-function createRateLimiter({ windowMs, max, message }) {
+const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
+/**
+ * POST routes that only read state (excluded from write limit bucket).
+ * Still counted by the global /api limiter.
+ */
+const WRITE_LIMIT_SKIP_PATHS = new Set([
+  "/interactions/engagements/batch",
+  "/posts/mentions/resolve",
+]);
+
+function normalizePath(path) {
+  if (!path || path === "/") {
+    return "/";
+  }
+  return path.replace(/\/+$/, "") || "/";
+}
+
+function shouldSkipWriteLimit(req) {
+  return WRITE_LIMIT_SKIP_PATHS.has(normalizePath(req.path));
+}
+
+function createRateLimiter({ windowMs, max, message, methods, skip }) {
   const hits = new Map();
 
   function prune(now) {
@@ -15,6 +37,14 @@ function createRateLimiter({ windowMs, max, message }) {
   }
 
   return function rateLimitMiddleware(req, res, next) {
+    if (methods && !methods.has(req.method)) {
+      return next();
+    }
+
+    if (skip?.(req)) {
+      return next();
+    }
+
     const now = Date.now();
     prune(now);
 
@@ -52,14 +82,16 @@ function createRateLimiter({ windowMs, max, message }) {
 
 const apiRateLimit = createRateLimiter({
   windowMs: 60_000,
-  max: Number(process.env.API_RATE_LIMIT_PER_MINUTE) || 120,
+  max: Number(process.env.API_RATE_LIMIT_PER_MINUTE) || 180,
   message: "Çok fazla istek. Lütfen kısa süre sonra tekrar deneyin.",
 });
 
 const writeRateLimit = createRateLimiter({
   windowMs: 60_000,
-  max: Number(process.env.API_WRITE_RATE_LIMIT_PER_MINUTE) || 40,
+  max: Number(process.env.API_WRITE_RATE_LIMIT_PER_MINUTE) || 100,
   message: "Çok fazla yazma isteği. Lütfen kısa süre sonra tekrar deneyin.",
+  methods: MUTATING_METHODS,
+  skip: shouldSkipWriteLimit,
 });
 
 const uploadRateLimit = createRateLimiter({
@@ -70,6 +102,10 @@ const uploadRateLimit = createRateLimiter({
 
 module.exports = {
   createRateLimiter,
+  normalizePath,
+  shouldSkipWriteLimit,
+  MUTATING_METHODS,
+  WRITE_LIMIT_SKIP_PATHS,
   apiRateLimit,
   writeRateLimit,
   uploadRateLimit,

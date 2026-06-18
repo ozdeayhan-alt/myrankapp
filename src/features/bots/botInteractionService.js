@@ -1,28 +1,28 @@
 const { applyInteraction } = require("../ranking/engine/applyInteraction");
-const { applyLikeBonus } = require("../ranking/engine/applyLikeBonus");
+const { applyPostVoteBatch } = require("../ranking/engine/applyPostVoteBatch");
 const { applyProfileVoteBatch } = require("../ranking/engine/applyProfileVoteBatch");
 const {
-  notifyPostInteraction,
+  notifyPostVotes,
   notifyProfileVotes,
 } = require("../notifications/createNotification");
 const { isBotAccount } = require("./botUserService");
 const { randomInt } = require("./botUtils");
 
-async function botLikePost({ botId, postId, notify = true }) {
-  const result = await applyInteraction({
+async function botLikePost({ botId, postId, notify = true, delta = 1 }) {
+  const result = await applyPostVoteBatch({
     postId,
     actorId: botId,
-    type: "like",
+    delta,
   });
 
-  if (notify && result.authorId && result.authorId !== botId) {
+  if (notify && result.authorId && result.authorId !== botId && delta > 0) {
     const targetIsBot = await isBotAccount(result.authorId);
     if (!targetIsBot) {
-      void notifyPostInteraction({
+      void notifyPostVotes({
         authorId: result.authorId,
         actorId: botId,
         postId,
-        type: "like",
+        delta,
       }).catch((err) => {
         console.error("[bot-like-notify]", err.message ?? err);
       });
@@ -33,11 +33,7 @@ async function botLikePost({ botId, postId, notify = true }) {
 }
 
 async function botLikeBonus99({ botId, postId }) {
-  return applyLikeBonus({
-    postId,
-    actorId: botId,
-    bonusPoints: 99,
-  });
+  return botLikePost({ botId, postId, notify: false, delta: 99 });
 }
 
 async function botProfileBoost({ botId, targetUserId, notify = true }) {

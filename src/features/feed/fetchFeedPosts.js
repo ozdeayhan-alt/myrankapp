@@ -70,17 +70,6 @@ async function fetchRecentFeedPage({ cursor, limit = DEFAULT_LIMIT }) {
   return buildPageResult(snap.docs, pageSize, "createdAt");
 }
 
-async function fetchTopFeedPage({ limit = 10 }) {
-  const pageSize = Math.min(Math.max(Number(limit) || 10, 1), 50);
-  const snap = await db
-    .collection("posts")
-    .orderBy("postScore", "desc")
-    .limit(pageSize)
-    .get();
-
-  return buildPageResult(snap.docs, pageSize, "postScore");
-}
-
 async function fetchExploreFeedPage({
   segmentKey,
   filters,
@@ -447,7 +436,6 @@ async function fetchHashtagFeedPage({
 
 module.exports = {
   fetchRecentFeedPage,
-  fetchTopFeedPage,
   fetchExploreFeedPage,
   fetchFollowingFeedPage,
   fetchAuthorFeedPage,

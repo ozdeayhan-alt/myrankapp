@@ -5,6 +5,8 @@ const {
   isMetadataComplete,
 } = require("../../lib/segmentKey");
 const { DEFAULT_DISPLAY_NAME } = require("../ranking/engine/updateRankings");
+const { ensureSegmentBotsForMetadata } = require("../bots/segmentBotService");
+const { isSegmentBotUserId } = require("../bots/segmentBotPersonas");
 
 async function resolveAheadFields(coll, rank) {
   if (rank <= 1) {
@@ -65,6 +67,17 @@ async function ensureUserRankingEntries(userId) {
 
   if (!isMetadataComplete(metadata)) {
     return { ensured: false, reason: "metadata_incomplete", segments: [] };
+  }
+
+  if (!userData.isBot && !isSegmentBotUserId(userId)) {
+    try {
+      await ensureSegmentBotsForMetadata(metadata);
+    } catch (error) {
+      console.error(
+        "[ensure-ranking] segment bot seed failed:",
+        error?.message ?? error
+      );
+    }
   }
 
   const totalScore =

@@ -139,6 +139,9 @@ async function followUser(followerId, targetUserId) {
   const snap = await ref.get();
 
   if (snap.exists) {
+    void backfillFollowerFeed(followerId, targetUserId).catch((error) => {
+      console.error("[followUser] feed backfill failed:", error.message ?? error);
+    });
     return { ok: true, targetUserId, following: true };
   }
 

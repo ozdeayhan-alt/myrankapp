@@ -40,6 +40,12 @@ function syncPublicProfileInTransaction(
     if (userData.metadata && typeof userData.metadata === "object") {
       payload.metadata = userData.metadata;
     }
+    if (userData.isBot === true) {
+      payload.isBot = true;
+    }
+    if (typeof userData.botRole === "string" && userData.botRole.trim()) {
+      payload.botRole = userData.botRole.trim();
+    }
   }
 
   transaction.set(publicRef, payload, { merge: true });

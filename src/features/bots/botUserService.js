@@ -37,6 +37,12 @@ async function syncPublicProfile(userId, data) {
   if (data.metadata) {
     payload.metadata = data.metadata;
   }
+  if (data.isBot === true) {
+    payload.isBot = true;
+  }
+  if (typeof data.botRole === "string" && data.botRole.trim()) {
+    payload.botRole = data.botRole.trim();
+  }
 
   await db.collection("publicProfiles").doc(userId).set(payload, { merge: true });
 }
@@ -107,8 +113,10 @@ async function upsertBotUser(persona, { initialScore } = {}) {
     photoURL,
     bio,
     bioCategoryVisibility: BIO_CATEGORY_VISIBILITY,
-    metadata,
-    totalScore,
+    metadata: persona.metadata,
+    totalScore: persona.totalScore,
+    isBot: true,
+    botRole: "community",
   });
 
   await ensureUserRankingEntries(persona.uid);
@@ -144,4 +152,5 @@ module.exports = {
   upsertBotUser,
   syncPublicProfile,
   isBotAccount,
+  ensureAuthUser,
 };

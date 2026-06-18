@@ -13,6 +13,9 @@ echo "==> Firestore indexes"
 GOOGLE_APPLICATION_CREDENTIALS="${ROOT}/service-account.json" \
   firebase deploy --only firestore:indexes --non-interactive
 
+echo "==> Nginx gzip (JSON API)"
+cp deploy/nginx-gzip.conf /etc/nginx/conf.d/myrank-gzip.conf
+
 echo "==> Nginx HTTP proxy (port 80 -> 3000)"
 cp deploy/nginx-api-http.conf /etc/nginx/sites-available/myrank-api
 ln -sf /etc/nginx/sites-available/myrank-api /etc/nginx/sites-enabled/myrank-api

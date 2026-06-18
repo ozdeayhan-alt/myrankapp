@@ -5,8 +5,6 @@ const { syncPublicProfileInTransaction } = require("../../profile/syncPublicProf
 const { resolveUserPublic } = require("../../messages/resolveUserPublic");
 
 const COUNT_FIELD = {
-  like: "likeCount",
-  dislike: "dislikeCount",
   share: "shareCount",
   comment: "commentCount",
   save: "saveCount",
@@ -29,18 +27,18 @@ function getCountsFromPost(post) {
   };
 }
 
-function parseBonusPoints(value) {
-  return typeof value === "number" && [33, 66, 99].includes(value) ? value : null;
-}
-
 function buildEngagementFromDoc(eng = {}) {
+  const voteNet =
+    typeof eng.voteNet === "number" && Number.isFinite(eng.voteNet)
+      ? eng.voteNet
+      : 0;
+
   return {
     shared: Boolean(eng.shared),
     saved: Boolean(eng.saved),
-    liked: Boolean(eng.liked),
-    disliked: Boolean(eng.disliked),
-    likeBonusPoints: parseBonusPoints(eng.likeBonusPoints),
-    dislikeBonusPoints: parseBonusPoints(eng.dislikeBonusPoints),
+    liked: false,
+    disliked: false,
+    voteNet,
   };
 }
 
@@ -100,126 +98,11 @@ function applyAuthorScoreUpdate(
 }
 
 /**
- * Instagram-style toggle: one like or dislike per user per post.
- */
-async function applyLikeDislikeInteraction({ postId, actorId, type }) {
-  const postRef = db.collection("posts").doc(postId);
-  const interactionRef = db.collection("interactions").doc();
-  const engRef = db.collection("actorEngagements").doc(actorDocId(actorId, postId));
-
-  return db.runTransaction(async (transaction) => {
-    const postSnap = await transaction.get(postRef);
-    if (!postSnap.exists) {
-      throw new Error("Post not found");
-    }
-
-    const post = postSnap.data();
-    const authorId = post.authorId;
-    const userRef = db.collection("users").doc(authorId);
-    const userSnap = await transaction.get(userRef);
-    const engSnap = await transaction.get(engRef);
-
-    const counts = getCountsFromPost(post);
-    const eng = engSnap.exists ? engSnap.data() : {};
-    let liked = Boolean(eng.liked);
-    let disliked = Boolean(eng.disliked);
-
-    if (type === "like") {
-      if (liked) {
-        counts.likeCount = Math.max(0, counts.likeCount - 1);
-        liked = false;
-      } else {
-        counts.likeCount += 1;
-        liked = true;
-        if (disliked) {
-          counts.dislikeCount = Math.max(0, counts.dislikeCount - 1);
-          disliked = false;
-        }
-      }
-    } else if (type === "dislike") {
-      if (disliked) {
-        counts.dislikeCount = Math.max(0, counts.dislikeCount - 1);
-        disliked = false;
-      } else {
-        counts.dislikeCount += 1;
-        disliked = true;
-        if (liked) {
-          counts.likeCount = Math.max(0, counts.likeCount - 1);
-          liked = false;
-        }
-      }
-    }
-
-    const bonusTotals = getBonusTotals(post);
-    const oldPostScore = post.postScore ?? 0;
-    const newPostScore = calculatePostScore({ ...counts, ...bonusTotals });
-    const scoreDelta = newPostScore - oldPostScore;
-    const oldAuthorTotalScore = userSnap.exists
-      ? (userSnap.data().totalScore ?? 0)
-      : 0;
-    const newAuthorTotalScore = oldAuthorTotalScore + scoreDelta;
-
-    const engagement = buildEngagementFromDoc({ ...eng, liked, disliked });
-
-    transaction.set(
-      engRef,
-      {
-        actorId,
-        postId,
-        liked,
-        disliked,
-        updatedAt: FieldValue.serverTimestamp(),
-      },
-      { merge: true }
-    );
-
-    transaction.set(interactionRef, {
-      type,
-      actorId,
-      postId,
-      authorId,
-      pointsDelta: scoreDelta,
-      alreadyInteracted: false,
-      createdAt: FieldValue.serverTimestamp(),
-    });
-
-    transaction.update(postRef, {
-      ...counts,
-      postScore: newPostScore,
-    });
-
-    applyAuthorScoreUpdate(transaction, {
-      userRef,
-      userSnap,
-      authorId,
-      scoreDelta,
-      newAuthorTotalScore,
-    });
-
-    return buildResultBase({
-      postId,
-      authorId,
-      postScore: newPostScore,
-      scoreDelta,
-      authorTotalScore: newAuthorTotalScore,
-      counts,
-      engagement,
-      alreadyInteracted: false,
-      firstAction: true,
-    });
-  });
-}
-
-/**
  * Etkileşim -> atomic DB update (interaction + post + user.totalScore)
  */
 async function applyInteraction({ postId, actorId, type, commentText }) {
   if (!COUNT_FIELD[type]) {
     throw new Error(`Invalid interaction type: ${type}`);
-  }
-
-  if (type === "like" || type === "dislike") {
-    return applyLikeDislikeInteraction({ postId, actorId, type });
   }
 
   const actorProfile =

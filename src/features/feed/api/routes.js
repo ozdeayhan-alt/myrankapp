@@ -11,7 +11,6 @@ const { attachEngagementsToFeedPage } = require("../feedEngagement");
 const { fetchSavedPostsPage } = require("../fetchSavedPosts");
 const {
   fetchRecentFeedPage,
-  fetchTopFeedPage,
   fetchExploreFeedPage,
   fetchFollowingFeedPage,
   fetchAuthorFeedPage,
@@ -89,35 +88,6 @@ router.get("/feed/recent", verifyAuth, async (req, res) => {
   } catch (error) {
     res.status(500).json({
       error: error.message ?? "Feed recent request failed",
-    });
-  }
-});
-
-router.get("/feed/top", verifyAuth, async (req, res) => {
-  try {
-    const limit =
-      typeof req.query.limit === "string" ? req.query.limit : undefined;
-    const cacheKey = getCacheKey([
-      "feed",
-      "top",
-      req.user.uid,
-      limit ?? "",
-    ]);
-
-    const cached = getCached(cacheKey);
-    if (cached) {
-      return res.json({ ok: true, ...cached });
-    }
-
-    const page = await buildFeedResponse(
-      req.user.uid,
-      await fetchTopFeedPage({ limit }),
-      cacheKey
-    );
-    res.json({ ok: true, ...page });
-  } catch (error) {
-    res.status(500).json({
-      error: error.message ?? "Feed top request failed",
     });
   }
 });

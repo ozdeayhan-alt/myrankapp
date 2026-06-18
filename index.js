@@ -4,6 +4,7 @@ const path = require("path");
 const { configureNetworkDns } = require("./src/lib/configureNetworkDns");
 configureNetworkDns();
 
+const compression = require("compression");
 const express = require("express");
 
 const MOBILE_APK_PATH = path.join(
@@ -46,6 +47,17 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const API_TIMEOUT_MS = Number(process.env.API_TIMEOUT_MS) || 25000;
 
+app.use(
+  compression({
+    threshold: 1024,
+    filter: (req, res) => {
+      if (req.headers["x-no-compression"]) {
+        return false;
+      }
+      return compression.filter(req, res);
+    },
+  })
+);
 app.use(express.json({ limit: "25mb" }));
 
 app.use("/api", apiRateLimit);

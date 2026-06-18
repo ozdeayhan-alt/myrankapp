@@ -73,7 +73,6 @@ function invalidateFeedCachesForPost({
   invalidateMatchingFeedCache(
     (key) =>
       key.includes(":recent:") ||
-      key.includes(":top:") ||
       key.includes(":following:") ||
       key.includes(":explore:")
   );

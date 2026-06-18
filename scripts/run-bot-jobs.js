@@ -12,6 +12,9 @@ const {
   processWeeklyPosts,
   processWeeklyCombo,
 } = require("../src/features/bots/botWeeklyService");
+const {
+  processSegmentBotWeeklyPosts,
+} = require("../src/features/bots/segmentBotWeeklyService");
 
 async function main() {
   console.log("[bot-jobs] Welcome queue...");
@@ -21,6 +24,10 @@ async function main() {
   console.log("[bot-jobs] Weekly posts...");
   const weeklyPosts = await processWeeklyPosts();
   console.log(`[bot-jobs] weekly posts: ${weeklyPosts.length}`);
+
+  console.log("[bot-jobs] Segment bot weekly tweets...");
+  const segmentWeekly = await processSegmentBotWeeklyPosts();
+  console.log(`[bot-jobs] segment weekly tweets: ${segmentWeekly.length}`);
 
   console.log("[bot-jobs] Weekly combo...");
   const combo = await processWeeklyCombo();

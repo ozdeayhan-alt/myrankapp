@@ -1,10 +1,12 @@
 /** @typedef {{ title?: string, paragraphs: string[] }} LegalSection */
 /** @typedef {{ title: string, updatedAt: string, sections: LegalSection[] }} LegalDocument */
 
+const SUPPORT_EMAIL = "ozdeayhan@gmail.com";
+
 /** @type {LegalDocument} */
 const PRIVACY_POLICY = {
   title: "Gizlilik Politikası",
-  updatedAt: "10 Haziran 2026",
+  updatedAt: "17 Haziran 2026",
   sections: [
     {
       paragraphs: [
@@ -55,9 +57,17 @@ const PRIVACY_POLICY = {
       ],
     },
     {
+      title: "Sistem profilleri",
+      paragraphs: [
+        "Sıralama liglerinde başlangıç yoğunluğu sağlamak için MyRank, otomatik oluşturulan sistem profilleri kullanabilir.",
+        "Bu profiller gerçek kullanıcı hesabı değildir; uygulama içinde “Sistem profili” olarak işaretlenir ve gerçek kişilerle karıştırılmamalıdır.",
+        "Sistem profilleri gerçek kullanıcılarla mesajlaşma veya kimlik taklidi amacıyla kullanılmaz.",
+      ],
+    },
+    {
       title: "İletişim",
       paragraphs: [
-        "Gizlilik ile ilgili sorularınız için uygulama içi destek kanallarımızı kullanabilirsiniz.",
+        `Gizlilik ile ilgili sorularınız için ${SUPPORT_EMAIL} adresine yazabilirsiniz.`,
       ],
     },
   ],
@@ -66,7 +76,7 @@ const PRIVACY_POLICY = {
 /** @type {LegalDocument} */
 const TERMS_OF_SERVICE = {
   title: "Kullanım Koşulları",
-  updatedAt: "10 Haziran 2026",
+  updatedAt: "17 Haziran 2026",
   sections: [
     {
       paragraphs: [
@@ -93,14 +103,15 @@ const TERMS_OF_SERVICE = {
       paragraphs: [
         "MyRank, etkileşim ve profil oylarına dayalı bir sıralama sistemi kullanır.",
         "Sıralama sonuçları bilgilendirme amaçlıdır; herhangi bir hukuki veya maddi hak doğurmaz.",
-        "Manipülasyon, sahte hesap veya otomatik etkileşim yasaktır.",
+        "Gerçek kullanıcılar için manipülasyon, sahte hesap veya otomatik etkileşim yasaktır.",
+        "Lig yoğunluğu için kullanılan sistem profilleri uygulama tarafından oluşturulur ve açıkça işaretlenir; bunlar gerçek kullanıcı hesabı sayılmaz.",
       ],
     },
     {
       title: "Hesap güvenliği",
       paragraphs: [
         "Hesap bilgilerinizin gizliliğinden siz sorumlusunuz.",
-        "Şüpheli aktivite fark ederseniz şifrenizi değiştirin ve destekle iletişime geçin.",
+        "Şüpheli aktivite fark ederseniz şifrenizi değiştirin ve destek ekibiyle iletişime geçin.",
       ],
     },
     {
@@ -123,7 +134,7 @@ const TERMS_OF_SERVICE = {
 /** @type {LegalDocument} */
 const MODERATION_POLICY = {
   title: "İçerik ve Moderasyon",
-  updatedAt: "10 Haziran 2026",
+  updatedAt: "17 Haziran 2026",
   sections: [
     {
       paragraphs: [
@@ -153,7 +164,7 @@ const MODERATION_POLICY = {
     {
       title: "Destek",
       paragraphs: [
-        "Moderasyon kararları veya güvenlik endişeleri için uygulama içi destek kanallarımızdan bize ulaşabilirsiniz.",
+        `Moderasyon kararları veya güvenlik endişeleri için ${SUPPORT_EMAIL} adresine yazabilirsiniz.`,
       ],
     },
   ],

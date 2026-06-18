@@ -1,4 +1,5 @@
 const { BOT_UID_SET } = require("./botPersonas");
+const { isSegmentBotUserId } = require("./segmentBotPersonas");
 
 function randomInt(min, max) {
   const lo = Math.ceil(min);
@@ -7,7 +8,7 @@ function randomInt(min, max) {
 }
 
 function isBotUserId(userId) {
-  return BOT_UID_SET.has(userId);
+  return BOT_UID_SET.has(userId) || isSegmentBotUserId(userId);
 }
 
 function daysBetween(a, b) {

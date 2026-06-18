@@ -68,11 +68,13 @@ npm run seed-bots
 npm run rebuild-rankings
 ```
 
-Periyodik job (welcome + haftalık post/combo):
+Periyodik job (welcome + haftalık post/combo + segment bot haftalık tweet):
 
 ```bash
 npm run run-bot-jobs
 ```
+
+**Segment botları:** Profil kategorileri tamamlanınca her tam lig için 7 bot otomatik seed edilir (`ensureUserRankingEntries`). Haftalık tweet cron ile farklı günlerde atılır.
 
 Önerilen crontab (6 saatte bir):
 
