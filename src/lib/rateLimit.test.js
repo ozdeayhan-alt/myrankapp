@@ -23,7 +23,7 @@ describe("rateLimit", () => {
     );
     assert.equal(
       shouldSkipWriteLimit({
-        path: "/interactions/session",
+        path: "/post-votes/batch",
       }),
       false
     );

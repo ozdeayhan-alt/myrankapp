@@ -100,6 +100,13 @@ const uploadRateLimit = createRateLimiter({
   message: "Çok fazla yükleme isteği. Lütfen kısa süre sonra tekrar deneyin.",
 });
 
+/** Vote batch routes — apply after verifyAuth so req.user.uid is set. */
+const voteRateLimit = createRateLimiter({
+  windowMs: 60_000,
+  max: Number(process.env.API_VOTE_RATE_LIMIT_PER_MINUTE) || 20,
+  message: "Çok fazla oy isteği. Lütfen kısa süre sonra tekrar deneyin.",
+});
+
 module.exports = {
   createRateLimiter,
   normalizePath,
@@ -109,4 +116,5 @@ module.exports = {
   apiRateLimit,
   writeRateLimit,
   uploadRateLimit,
+  voteRateLimit,
 };

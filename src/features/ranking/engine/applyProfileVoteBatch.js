@@ -2,7 +2,7 @@ const { FieldValue } = require("firebase-admin/firestore");
 const { db } = require("../../../lib/firestore");
 const { syncPublicProfileInTransaction } = require("../../profile/syncPublicProfile");
 
-const MAX_PROFILE_VOTE_DELTA = 10_000;
+const MAX_PROFILE_VOTE_DELTA = 200;
 
 function parseDelta(body) {
   if (typeof body.delta === "number" && Number.isFinite(body.delta)) {

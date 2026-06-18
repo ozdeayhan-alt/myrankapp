@@ -1,6 +1,6 @@
 const express = require("express");
 const { verifyAuth } = require("../../../lib/verifyAuth");
-const { writeRateLimit } = require("../../../lib/rateLimit");
+const { writeRateLimit, voteRateLimit } = require("../../../lib/rateLimit");
 const {
   applyInteraction,
   getEngagementStatus,
@@ -29,6 +29,19 @@ function fireNotification(promise) {
   void promise.catch((err) => {
     console.error("[notification]", err.message ?? err);
   });
+}
+
+function logVoteBatch({ userId, postId, targetUserId, delta }) {
+  console.log(
+    JSON.stringify({
+      event: "vote_batch",
+      userId,
+      ...(postId ? { postId } : {}),
+      ...(targetUserId ? { targetUserId } : {}),
+      delta,
+      ts: new Date().toISOString(),
+    })
+  );
 }
 
 router.get("/interactions/engagement", verifyAuth, async (req, res) => {
@@ -72,7 +85,7 @@ router.post("/interactions/engagements/batch", verifyAuth, async (req, res) => {
   }
 });
 
-router.post("/profile-votes/batch", verifyAuth, async (req, res) => {
+router.post("/profile-votes/batch", verifyAuth, voteRateLimit, async (req, res) => {
   try {
     const { targetUserId } = req.body;
     const delta = parseDelta(req.body);
@@ -96,6 +109,12 @@ router.post("/profile-votes/batch", verifyAuth, async (req, res) => {
         error: `delta cannot exceed ${MAX_PROFILE_VOTE_DELTA}`,
       });
     }
+
+    logVoteBatch({
+      userId: req.user.uid,
+      targetUserId,
+      delta,
+    });
 
     const result = await applyProfileVoteBatch({
       actorId: req.user.uid,
@@ -121,7 +140,7 @@ router.post("/profile-votes/batch", verifyAuth, async (req, res) => {
   }
 });
 
-router.post("/post-votes/batch", verifyAuth, async (req, res) => {
+router.post("/post-votes/batch", verifyAuth, voteRateLimit, async (req, res) => {
   try {
     const { postId } = req.body;
     const delta = parseDelta(req.body);
@@ -145,6 +164,12 @@ router.post("/post-votes/batch", verifyAuth, async (req, res) => {
         error: `delta cannot exceed ${MAX_POST_VOTE_DELTA}`,
       });
     }
+
+    logVoteBatch({
+      userId: req.user.uid,
+      postId,
+      delta,
+    });
 
     const result = await applyPostVoteBatch({
       actorId: req.user.uid,
