@@ -1,7 +1,7 @@
 /** @typedef {{ title?: string, paragraphs: string[] }} LegalSection */
 /** @typedef {{ title: string, updatedAt: string, sections: LegalSection[] }} LegalDocument */
 
-const SUPPORT_EMAIL = "ozdeayhan@gmail.com";
+const SUPPORT_EMAIL = "myrankteam@gmail.com";
 
 /** @type {LegalDocument} */
 const PRIVACY_POLICY = {
