@@ -2,6 +2,7 @@
 /** @typedef {{ title: string, updatedAt: string, sections: LegalSection[] }} LegalDocument */
 
 const SUPPORT_EMAIL = "myrankteam@gmail.com";
+const CHILD_SAFETY_CONTACT = "ozdeayhan@gmail.com";
 
 /** @type {LegalDocument} */
 const PRIVACY_POLICY = {
@@ -170,10 +171,70 @@ const MODERATION_POLICY = {
   ],
 };
 
+/** @type {LegalDocument} */
+const CHILD_SAFETY_POLICY = {
+  title: "Çocuk Güvenliği Standartları",
+  updatedAt: "19 Haziran 2026",
+  sections: [
+    {
+      paragraphs: [
+        "MyRank, yalnızca 18 yaş ve üzeri kullanıcılar için tasarlanmış bir sosyal platformdur. Çocuklara yönelik değildir ve reşit olmayan bireylerin kullanımına izin verilmez.",
+        "Bu sayfa, Google Play Çocuk Güvenliği Standartları kapsamında çocukların cinsel istismarı ve çocuk istismarına (CSAE) ve çocuklara yönelik cinsel istismar materyaline (CSAM) karşı uyguladığımız standartları açıklar.",
+      ],
+    },
+    {
+      title: "Sıfır tolerans",
+      paragraphs: [
+        "MyRank, CSAE ve CSAM içeren veya buna teşvik eden tüm içeriklere, davranışlara ve hesaplara karşı sıfır tolerans uygular.",
+        "Reşit olmayan bireyleri hedef alan, cinsel sömürü içeren, grooming (tuzak kurma) amaçlı veya çocuk istismarını normalleştiren içerikler kesinlikle yasaktır.",
+        "Bu tür ihlaller tespit edildiğinde içerik derhal kaldırılır ve ilgili hesaplar kalıcı olarak kapatılır.",
+      ],
+    },
+    {
+      title: "Yaş sınırı",
+      paragraphs: [
+        "Kayıt ve kullanım için minimum yaş 18’dir. Reşit olmayan kullanıcıların hesap açması veya platformu kullanması yasaktır.",
+        "Yaş bilgisinin yanlış beyan edildiği tespit edilirse hesap askıya alınır veya silinir.",
+      ],
+    },
+    {
+      title: "Bildirim ve şikayet",
+      paragraphs: [
+        "Kullanıcılar, gönderi ve profil menülerindeki “Şikayet et” seçeneğiyle uygunsuz içerik bildirebilir.",
+        "CSAE/CSAM şüphesi taşıyan içerikler acil güvenlik bildirimi olarak değerlendirilir ve öncelikli incelenir.",
+        "Kullanıcılar ayrıca istemedikleri kişileri engelleyebilir.",
+      ],
+    },
+    {
+      title: "İnceleme ve müdahale",
+      paragraphs: [
+        "Şikayetler incelenir; ihlal tespit edilen içerikler platformdan kaldırılır.",
+        "Tekrarlayan veya ciddi ihlallerde hesaplar uyarı verilmeksizin kalıcı olarak kapatılır.",
+        "Gerekli durumlarda ilgili içerik, hesap bilgileri ve kayıtlar yasal yükümlülükler çerçevesinde yetkili kolluk kuvvetleri ve ilgili kurumlarla paylaşılabilir.",
+      ],
+    },
+    {
+      title: "Yasal iş birliği",
+      paragraphs: [
+        "MyRank, CSAE/CSAM ile ilgili ciddi vakalarda yürürlükteki mevzuata uygun şekilde yetkili makamlara bildirimde bulunmayı taahhüt eder.",
+        "Yasal talepler, geçerli mahkeme kararları ve resmi makam bildirimleri usulüne uygun şekilde yanıtlanır.",
+      ],
+    },
+    {
+      title: "İletişim",
+      paragraphs: [
+        `CSAE/CSAM önleme uygulamaları ve bu politika hakkında bilgi için belirlenmiş iletişim: ${CHILD_SAFETY_CONTACT}`,
+        `Genel moderasyon ve destek: ${SUPPORT_EMAIL}`,
+      ],
+    },
+  ],
+};
+
 const LEGAL_PAGES = {
   privacy: PRIVACY_POLICY,
   terms: TERMS_OF_SERVICE,
   moderation: MODERATION_POLICY,
+  childSafety: CHILD_SAFETY_POLICY,
 };
 
 function escapeHtml(value) {
@@ -224,6 +285,7 @@ function renderLegalHtml(document) {
     <a href="/privacy">Gizlilik</a>
     <a href="/terms">Kullanım Koşulları</a>
     <a href="/moderation">Moderasyon</a>
+    <a href="/child-safety">Çocuk Güvenliği</a>
   </nav>
 </body>
 </html>`;

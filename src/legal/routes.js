@@ -12,6 +12,10 @@ function registerLegalRoutes(app) {
   app.get("/moderation", (_req, res) => {
     res.type("html").send(renderLegalHtml(LEGAL_PAGES.moderation));
   });
+
+  app.get("/child-safety", (_req, res) => {
+    res.type("html").send(renderLegalHtml(LEGAL_PAGES.childSafety));
+  });
 }
 
 module.exports = { registerLegalRoutes };

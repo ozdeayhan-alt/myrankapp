@@ -79,6 +79,7 @@ app.get("/", (req, res) => {
     privacyPolicy: "/privacy",
     termsOfService: "/terms",
     moderationPolicy: "/moderation",
+    childSafetyPolicy: "/child-safety",
   });
 });
 
