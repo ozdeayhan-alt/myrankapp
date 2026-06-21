@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node index.js",
     "dev": "node --watch index.js",
-    "test": "node --test src/lib/hlsPlaylist.test.js src/lib/rateLimit.test.js src/features/bots/segmentBotPersonas.test.js scripts/rebuild-rankings.segmentBots.test.js",
+    "test": "node --test src/lib/hlsPlaylist.test.js src/lib/rateLimit.test.js src/features/bots/segmentBotPersonas.test.js src/features/ai-stories/sceneMapper.test.js scripts/rebuild-rankings.segmentBots.test.js",
     "check": "npm test && node --check index.js",
     "test-push": "node scripts/test-expo-push.js",
     "prune-push-tokens": "node scripts/prune-push-tokens.js",

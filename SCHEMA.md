@@ -139,6 +139,26 @@ Gece sıralama job meta (ör. son rebuild zamanı). Mobil profil accordion “So
 
 `segmentKey` örneği: `country:TR|city:Istanbul|gender:K|age:25|profession:Engineer|maritalStatus:Single`
 
+### `ai_stories/{storyId}`
+
+24 saatlik template tabanlı vibe story (AI Story MVP). Yazma yalnızca backend API.
+
+| Field | Type | Notes |
+|-------|------|-------|
+| userId | string | Story sahibi |
+| authorDisplayName | string | Snapshot |
+| authorPhotoURL | string | Snapshot (opsiyonel) |
+| moodKey | string | Chip key |
+| locationKey | string | Chip key |
+| actionKey | string | Chip key |
+| caption | string | Opsiyonel, max 40 karakter |
+| sceneId | string | Template id |
+| template | object | backgroundUrl, overlays, colorGrade, animationPreset |
+| status | string | `completed` (MVP) |
+| sharedPostId | string | Feed'e paylaşıldıysa post id |
+| createdAt | timestamp | |
+| expiresAt | timestamp | createdAt + 24h |
+
 ## Security Notes
 
 - Client: `users` metadata read/write (own doc only), `totalScore` **write yasak**

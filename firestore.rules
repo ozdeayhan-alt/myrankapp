@@ -118,5 +118,11 @@ service cloud.firestore {
         allow write: if false;
       }
     }
+
+    match /ai_stories/{storyId} {
+      allow read: if isSignedIn()
+        && resource.data.expiresAt > request.time;
+      allow write: if false;
+    }
   }
 }
