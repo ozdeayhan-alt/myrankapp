@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node index.js",
     "dev": "node --watch index.js",
-    "test": "node --test src/lib/hlsPlaylist.test.js src/lib/rateLimit.test.js src/features/bots/segmentBotPersonas.test.js src/features/ai-stories/sceneMapper.test.js scripts/rebuild-rankings.segmentBots.test.js",
+    "test": "node --test src/lib/hlsPlaylist.test.js src/lib/rateLimit.test.js src/features/bots/segmentBotPersonas.test.js scripts/rebuild-rankings.segmentBots.test.js",
     "check": "npm test && node --check index.js",
     "test-push": "node scripts/test-expo-push.js",
     "prune-push-tokens": "node scripts/prune-push-tokens.js",
@@ -14,6 +14,7 @@
     "ensure-authorized-domains": "node scripts/ensure-authorized-domains.js",
     "rebuild-rankings": "node scripts/rebuild-rankings.js",
     "seed-bots": "node scripts/seed-bots.js",
+    "seed-bot-stories": "node scripts/seed-bot-stories.js",
     "run-bot-jobs": "node scripts/run-bot-jobs.js",
     "backfill-display-name-lower": "node scripts/backfill-display-name-lower.js",
     "backfill-photo-urls": "node scripts/backfill-photo-urls.js",

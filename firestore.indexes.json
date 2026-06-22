@@ -147,7 +147,7 @@
       ]
     },
     {
-      "collectionGroup": "ai_stories",
+      "collectionGroup": "stories",
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "userId", "order": "ASCENDING" },
@@ -155,7 +155,7 @@
       ]
     },
     {
-      "collectionGroup": "ai_stories",
+      "collectionGroup": "stories",
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "expiresAt", "order": "ASCENDING" },

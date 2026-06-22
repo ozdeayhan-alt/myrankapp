@@ -52,7 +52,7 @@ router.post("/uploads/sign", verifyAuth, async (req, res) => {
     if (!isAllowedStoragePath(normalizedPath, req.user.uid)) {
       return res.status(403).json({
         error:
-          "storagePath must be under posts/{uid}/, profiles/{uid}/ or messages/{uid}/",
+          "storagePath must be under posts/{uid}/, profiles/{uid}/, messages/{uid}/ or stories/{uid}/",
       });
     }
 
@@ -95,7 +95,7 @@ router.post("/uploads/finalize", verifyAuth, async (req, res) => {
     if (!isAllowedStoragePath(normalizedPath, req.user.uid)) {
       return res.status(403).json({
         error:
-          "storagePath must be under posts/{uid}/, profiles/{uid}/ or messages/{uid}/",
+          "storagePath must be under posts/{uid}/, profiles/{uid}/, messages/{uid}/ or stories/{uid}/",
       });
     }
 
@@ -130,7 +130,7 @@ router.post("/uploads/process-video", verifyAuth, async (req, res) => {
     if (!isAllowedStoragePath(normalizedPath, req.user.uid)) {
       return res.status(403).json({
         error:
-          "storagePath must be under posts/{uid}/, profiles/{uid}/ or messages/{uid}/",
+          "storagePath must be under posts/{uid}/, profiles/{uid}/, messages/{uid}/ or stories/{uid}/",
       });
     }
 
@@ -182,7 +182,7 @@ router.post("/uploads", verifyAuth, async (req, res) => {
     if (!isAllowedStoragePath(normalizedPath, req.user.uid)) {
       return res.status(403).json({
         error:
-          "storagePath must be under posts/{uid}/, profiles/{uid}/ or messages/{uid}/",
+          "storagePath must be under posts/{uid}/, profiles/{uid}/, messages/{uid}/ or stories/{uid}/",
       });
     }
 

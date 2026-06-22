@@ -36,7 +36,7 @@ const searchRoutes = require("./src/features/search/api/routes");
 const pushRoutes = require("./src/features/push/api/routes");
 const blocksRoutes = require("./src/features/blocks/api/routes");
 const accountRoutes = require("./src/features/account/api/routes");
-const aiStoriesRoutes = require("./src/features/ai-stories/api/routes");
+const storiesRoutes = require("./src/features/stories/api/routes");
 const { registerLegalRoutes } = require("./src/legal/routes");
 const {
   apiRateLimit,
@@ -161,7 +161,7 @@ app.use("/api", searchRoutes);
 app.use("/api", pushRoutes);
 app.use("/api", blocksRoutes);
 app.use("/api", accountRoutes);
-app.use("/api", aiStoriesRoutes);
+app.use("/api", storiesRoutes);
 
 app.listen(PORT, () => {
   console.log(`Sunucu http://localhost:${PORT} adresinde çalışıyor`);

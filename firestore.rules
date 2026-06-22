@@ -119,7 +119,7 @@ service cloud.firestore {
       }
     }
 
-    match /ai_stories/{storyId} {
+    match /stories/{storyId} {
       allow read: if isSignedIn()
         && resource.data.expiresAt > request.time;
       allow write: if false;

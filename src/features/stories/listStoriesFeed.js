@@ -8,14 +8,10 @@ function serializeStory(doc) {
     userId: data.userId,
     authorDisplayName: data.authorDisplayName ?? "",
     authorPhotoURL: data.authorPhotoURL ?? null,
-    moodKey: data.moodKey,
-    locationKey: data.locationKey,
-    actionKey: data.actionKey,
+    mediaType: data.mediaType,
+    mediaURL: data.mediaURL,
+    posterURL: data.posterURL ?? null,
     caption: data.caption ?? null,
-    sceneId: data.sceneId,
-    template: data.template,
-    status: data.status,
-    sharedPostId: data.sharedPostId ?? null,
     createdAt: data.createdAt?.toMillis?.() ?? null,
     expiresAt: data.expiresAt?.toMillis?.() ?? null,
   };
@@ -39,17 +35,16 @@ async function getFollowingUserIds(userId) {
 }
 
 /**
- * Active stories from people the user follows (including self).
  * @param {string} userId
  * @param {{ limit?: number }} [options]
  */
-async function listAiStoriesFeed(userId, options = {}) {
+async function listStoriesFeed(userId, options = {}) {
   const limit = Math.min(Math.max(Number(options.limit) || 30, 1), 50);
   const allowedUserIds = await getFollowingUserIds(userId);
   const now = admin.firestore.Timestamp.now();
 
   const snap = await db
-    .collection("ai_stories")
+    .collection("stories")
     .where("expiresAt", ">", now)
     .orderBy("expiresAt")
     .orderBy("createdAt", "desc")
@@ -68,8 +63,8 @@ async function listAiStoriesFeed(userId, options = {}) {
  * @param {string} userId
  * @param {string} storyId
  */
-async function getAiStoryById(userId, storyId) {
-  const ref = db.collection("ai_stories").doc(storyId);
+async function getStoryById(userId, storyId) {
+  const ref = db.collection("stories").doc(storyId);
   const doc = await ref.get();
   if (!doc.exists) {
     return null;
@@ -82,7 +77,7 @@ async function getAiStoryById(userId, storyId) {
   }
 
   const allowedUserIds = await getFollowingUserIds(userId);
-  if (!allowedUserIds.has(story.userId) && story.userId !== userId) {
+  if (!allowedUserIds.has(story.userId)) {
     return null;
   }
 
@@ -90,7 +85,7 @@ async function getAiStoryById(userId, storyId) {
 }
 
 module.exports = {
-  listAiStoriesFeed,
-  getAiStoryById,
+  listStoriesFeed,
+  getStoryById,
   serializeStory,
 };

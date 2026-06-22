@@ -21,6 +21,7 @@ const {
   uploadLocalFile,
   getBucketName,
 } = require("../src/lib/storageMedia");
+const { LEGACY_STORAGE_BUCKET, normalizeStoragePhotoUrl } = require("../src/lib/normalizeStoragePhotoUrl");
 
 const DEFAULT_LIMIT = 500;
 
@@ -39,10 +40,42 @@ function parseArgs(argv) {
   return { limit, dryRun };
 }
 
-async function objectExists(objectPath) {
-  const bucket = admin.storage().bucket(getBucketName());
+async function objectExistsInBucket(bucketName, objectPath) {
+  const bucket = admin.storage().bucket(bucketName);
   const [exists] = await bucket.file(objectPath).exists();
   return exists;
+}
+
+async function objectExists(objectPath) {
+  return objectExistsInBucket(getBucketName(), objectPath);
+}
+
+async function resolveMp4PathForPoster(mediaObjectPath) {
+  const mp4Path = deriveMp4ObjectPathForPoster(mediaObjectPath);
+  if (!mp4Path) {
+    return null;
+  }
+
+  if (await objectExists(mp4Path)) {
+    return mp4Path;
+  }
+
+  if (await objectExistsInBucket(LEGACY_STORAGE_BUCKET, mp4Path)) {
+    return { bucket: LEGACY_STORAGE_BUCKET, objectPath: mp4Path };
+  }
+
+  if (mediaObjectPath.endsWith(".mp4") && (await objectExists(mediaObjectPath))) {
+    return mediaObjectPath;
+  }
+
+  if (
+    mediaObjectPath.endsWith(".mp4") &&
+    (await objectExistsInBucket(LEGACY_STORAGE_BUCKET, mediaObjectPath))
+  ) {
+    return { bucket: LEGACY_STORAGE_BUCKET, objectPath: mediaObjectPath };
+  }
+
+  return null;
 }
 
 async function resolvePosterUrlIfExists(posterPath) {
@@ -66,7 +99,7 @@ async function resolvePosterUrlIfExists(posterPath) {
   return `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encoded}?alt=media`;
 }
 
-async function generatePosterFromMp4(mp4Path, posterPath, dryRun) {
+async function generatePosterFromMp4(mp4Source, posterPath, dryRun) {
   if (dryRun) {
     return `dry-run://${posterPath}`;
   }
@@ -76,7 +109,13 @@ async function generatePosterFromMp4(mp4Path, posterPath, dryRun) {
   const localPoster = path.join(tmpRoot, "poster.jpg");
 
   try {
-    await downloadObjectToFileWithRetry(mp4Path, localMp4);
+    if (typeof mp4Source === "string") {
+      await downloadObjectToFileWithRetry(mp4Source, localMp4);
+    } else {
+      const bucket = admin.storage().bucket(mp4Source.bucket);
+      fs.mkdirSync(path.dirname(localMp4), { recursive: true });
+      await bucket.file(mp4Source.objectPath).download({ destination: localMp4 });
+    }
     await extractPosterJpeg(localMp4, localPoster);
     return uploadLocalFile({
       objectPath: posterPath,
@@ -101,9 +140,10 @@ async function backfillPost(doc, dryRun) {
 
   const mp4Path = deriveMp4ObjectPathForPoster(mediaObjectPath);
   const posterPath = derivePosterObjectPath(mediaObjectPath);
-  if (!mp4Path || !posterPath) {
+  if (!posterPath) {
     return "skipped-bad-path";
   }
+  void mp4Path;
 
   const existingPosterUrl =
     typeof data.posterURL === "string" && data.posterURL.trim()
@@ -114,15 +154,24 @@ async function backfillPost(doc, dryRun) {
     : null;
 
   if (existingPosterPath && (await objectExists(existingPosterPath))) {
+    const normalized = normalizeStoragePhotoUrl(existingPosterUrl);
+    if (normalized.changed) {
+      const refreshed = await resolvePosterUrlIfExists(existingPosterPath);
+      if (refreshed && !dryRun) {
+        await doc.ref.set({ posterURL: refreshed }, { merge: true });
+      }
+      return normalized.changed ? "updated-url" : "skipped-has-poster";
+    }
     return "skipped-has-poster";
   }
 
   let posterURL = await resolvePosterUrlIfExists(posterPath);
   if (!posterURL) {
-    if (!(await objectExists(mp4Path))) {
+    const mp4Source = await resolveMp4PathForPoster(mediaObjectPath);
+    if (!mp4Source) {
       return "skipped-mp4-missing";
     }
-    posterURL = await generatePosterFromMp4(mp4Path, posterPath, dryRun);
+    posterURL = await generatePosterFromMp4(mp4Source, posterPath, dryRun);
   }
 
   if (!dryRun) {
@@ -136,28 +185,51 @@ async function main() {
   const { limit, dryRun } = parseArgs(process.argv.slice(2));
   console.log(`[backfill-posters] limit=${limit} dryRun=${dryRun}`);
 
-  const snap = await db
-    .collection("posts")
-    .where("contentType", "==", "video")
-    .limit(limit)
-    .get();
-
   const counts = {};
+  let lastId = null;
+  let scanned = 0;
 
-  for (const doc of snap.docs) {
-    try {
-      const result = await backfillPost(doc, dryRun);
-      counts[result] = (counts[result] || 0) + 1;
-      if (result === "updated" || result === "dry-run-updated") {
-        console.log(`${dryRun ? "[dry-run] " : ""}${doc.id} → poster ok`);
+  while (scanned < limit) {
+    let query = db
+      .collection("posts")
+      .where("contentType", "==", "video")
+      .orderBy("__name__")
+      .limit(Math.min(100, limit - scanned));
+
+    if (lastId) {
+      query = query.startAfter(lastId);
+    }
+
+    const snap = await query.get();
+    if (snap.empty) {
+      break;
+    }
+
+    for (const doc of snap.docs) {
+      try {
+        const result = await backfillPost(doc, dryRun);
+        counts[result] = (counts[result] || 0) + 1;
+        if (
+          result === "updated" ||
+          result === "updated-url" ||
+          result === "dry-run-updated"
+        ) {
+          console.log(`${dryRun ? "[dry-run] " : ""}${doc.id} → ${result}`);
+        }
+      } catch (error) {
+        counts.error = (counts.error || 0) + 1;
+        console.warn(`[backfill-posters] ${doc.id} failed:`, error.message);
       }
-    } catch (error) {
-      counts.error = (counts.error || 0) + 1;
-      console.warn(`[backfill-posters] ${doc.id} failed:`, error.message);
+    }
+
+    scanned += snap.size;
+    lastId = snap.docs[snap.docs.length - 1];
+    if (snap.size < 100) {
+      break;
     }
   }
 
-  console.log("[backfill-posters] summary", counts, `scanned=${snap.size}`);
+  console.log("[backfill-posters] summary", counts, `scanned=${scanned}`);
 }
 
 main().catch((error) => {

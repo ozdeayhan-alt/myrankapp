@@ -1,28 +1,33 @@
 const admin = require("../../../firebase-config");
 const { db } = require("../../lib/firestore");
-const {
-  MOOD_KEYS,
-  LOCATION_KEYS,
-  ACTION_KEYS,
-} = require("./chipKeys");
-const { resolveStoryScene } = require("./sceneMapper");
 const { sanitizeCaption } = require("./sanitizeCaption");
-const { AiStoryError } = require("./aiStoryErrors");
+const { StoryError } = require("./storyErrors");
 const { resolveUserPublic } = require("../messages/resolveUserPublic");
 
 const STORY_TTL_MS = 24 * 60 * 60 * 1000;
 const MAX_STORIES_PER_DAY = 5;
 
-function assertChipKey(value, allowed, label) {
-  if (!value || typeof value !== "string" || !allowed.has(value)) {
-    throw new AiStoryError(400, `Geçersiz ${label}`);
+function assertMediaType(value) {
+  if (value !== "image" && value !== "video") {
+    throw new StoryError(400, "Geçersiz medya türü");
   }
+}
+
+function assertMediaUrl(value, label) {
+  if (!value || typeof value !== "string" || !value.trim()) {
+    throw new StoryError(400, `${label} gerekli`);
+  }
+  const url = value.trim();
+  if (!/^https?:\/\//i.test(url)) {
+    throw new StoryError(400, "Geçersiz medya adresi");
+  }
+  return url;
 }
 
 async function countRecentStories(userId) {
   const since = admin.firestore.Timestamp.fromMillis(Date.now() - STORY_TTL_MS);
   const snap = await db
-    .collection("ai_stories")
+    .collection("stories")
     .where("userId", "==", userId)
     .where("createdAt", ">=", since)
     .count()
@@ -33,28 +38,24 @@ async function countRecentStories(userId) {
 
 /**
  * @param {string} userId
- * @param {{ moodKey: string, locationKey: string, actionKey: string, caption?: string | null }} input
+ * @param {{ mediaType: 'image' | 'video', mediaURL: string, posterURL?: string | null, caption?: string | null }} input
  */
-async function createAiStory(userId, input) {
-  assertChipKey(input.moodKey, MOOD_KEYS, "mood");
-  assertChipKey(input.locationKey, LOCATION_KEYS, "location");
-  assertChipKey(input.actionKey, ACTION_KEYS, "action");
-
+async function createStory(userId, input) {
+  assertMediaType(input.mediaType);
+  const mediaURL = assertMediaUrl(input.mediaURL, "mediaURL");
+  const posterURL =
+    input.posterURL && typeof input.posterURL === "string"
+      ? assertMediaUrl(input.posterURL, "posterURL")
+      : null;
   const caption = sanitizeCaption(input.caption);
 
   const recentCount = await countRecentStories(userId);
   if (recentCount >= MAX_STORIES_PER_DAY) {
-    throw new AiStoryError(
+    throw new StoryError(
       429,
-      "24 saat içinde en fazla 5 story oluşturabilirsiniz"
+      "24 saat içinde en fazla 5 story paylaşabilirsiniz"
     );
   }
-
-  const { sceneId, template } = resolveStoryScene({
-    moodKey: input.moodKey,
-    locationKey: input.locationKey,
-    actionKey: input.actionKey,
-  });
 
   const profile = await resolveUserPublic(userId);
   const now = admin.firestore.Timestamp.now();
@@ -66,19 +67,15 @@ async function createAiStory(userId, input) {
     userId,
     authorDisplayName: profile.displayName,
     authorPhotoURL: profile.photoURL ?? null,
-    moodKey: input.moodKey,
-    locationKey: input.locationKey,
-    actionKey: input.actionKey,
+    mediaType: input.mediaType,
+    mediaURL,
+    posterURL,
     caption,
-    sceneId,
-    template,
-    status: "completed",
-    sharedPostId: null,
     createdAt: now,
     expiresAt,
   };
 
-  const ref = await db.collection("ai_stories").add(doc);
+  const ref = await db.collection("stories").add(doc);
 
   return {
     ok: true,
@@ -92,7 +89,7 @@ async function createAiStory(userId, input) {
 }
 
 module.exports = {
-  createAiStory,
+  createStory,
   STORY_TTL_MS,
   MAX_STORIES_PER_DAY,
 };

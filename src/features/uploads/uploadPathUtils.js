@@ -16,10 +16,12 @@ function isAllowedStoragePath(storagePath, userId) {
   const postsPrefix = `posts/${userId}/`;
   const profilesPrefix = `profiles/${userId}/`;
   const messagesPrefix = `messages/${userId}/`;
+  const storiesPrefix = `stories/${userId}/`;
   return (
     storagePath.startsWith(postsPrefix) ||
     storagePath.startsWith(profilesPrefix) ||
-    storagePath.startsWith(messagesPrefix)
+    storagePath.startsWith(messagesPrefix) ||
+    storagePath.startsWith(storiesPrefix)
   );
 }
 
