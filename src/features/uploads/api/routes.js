@@ -15,7 +15,6 @@ const {
 const { processVideoUploadWithFallback } = require("../processVideo");
 
 const router = express.Router();
-router.use(uploadRateLimit);
 
 const STORAGE_BUCKET =
   process.env.FIREBASE_STORAGE_BUCKET ||
@@ -23,7 +22,7 @@ const STORAGE_BUCKET =
 
 const MAX_BASE64_LENGTH = 20 * 1024 * 1024;
 
-router.post("/uploads/sign", verifyAuth, async (req, res) => {
+router.post("/uploads/sign", verifyAuth, uploadRateLimit, async (req, res) => {
   try {
     const { storagePath, contentType, contentLength } = req.body;
 
@@ -74,7 +73,7 @@ router.post("/uploads/sign", verifyAuth, async (req, res) => {
   }
 });
 
-router.post("/uploads/finalize", verifyAuth, async (req, res) => {
+router.post("/uploads/finalize", verifyAuth, uploadRateLimit, async (req, res) => {
   try {
     const { storagePath, contentType } = req.body;
 
@@ -117,48 +116,53 @@ router.post("/uploads/finalize", verifyAuth, async (req, res) => {
   }
 });
 
-router.post("/uploads/process-video", verifyAuth, async (req, res) => {
-  try {
-    const { storagePath } = req.body;
+router.post(
+  "/uploads/process-video",
+  verifyAuth,
+  uploadRateLimit,
+  async (req, res) => {
+    try {
+      const { storagePath } = req.body;
 
-    if (!storagePath || typeof storagePath !== "string") {
-      return res.status(400).json({ error: "storagePath is required" });
-    }
+      if (!storagePath || typeof storagePath !== "string") {
+        return res.status(400).json({ error: "storagePath is required" });
+      }
 
-    const normalizedPath = normalizeStoragePath(storagePath);
+      const normalizedPath = normalizeStoragePath(storagePath);
 
-    if (!isAllowedStoragePath(normalizedPath, req.user.uid)) {
-      return res.status(403).json({
-        error:
-          "storagePath must be under posts/{uid}/, profiles/{uid}/, messages/{uid}/ or stories/{uid}/",
+      if (!isAllowedStoragePath(normalizedPath, req.user.uid)) {
+        return res.status(403).json({
+          error:
+            "storagePath must be under posts/{uid}/, profiles/{uid}/, messages/{uid}/ or stories/{uid}/",
+        });
+      }
+
+      if (!normalizedPath.endsWith(".mp4")) {
+        return res.status(400).json({ error: "Only .mp4 videos can be processed" });
+      }
+
+      const result = await processVideoUploadWithFallback(normalizedPath);
+
+      res.json({
+        ok: true,
+        skipped: Boolean(result.skipped),
+        reason: result.reason,
+        hlsURL: result.hlsURL,
+        mediaURL: result.mediaURL,
+        posterURL: result.posterURL,
+        hlsPrefix: result.hlsPrefix,
+      });
+    } catch (error) {
+      console.error("[uploads/process-video]", error);
+      res.status(500).json({
+        error: error.message ?? "Video processing failed",
       });
     }
-
-    if (!normalizedPath.endsWith(".mp4")) {
-      return res.status(400).json({ error: "Only .mp4 videos can be processed" });
-    }
-
-    const result = await processVideoUploadWithFallback(normalizedPath);
-
-    res.json({
-      ok: true,
-      skipped: Boolean(result.skipped),
-      reason: result.reason,
-      hlsURL: result.hlsURL,
-      mediaURL: result.mediaURL,
-      posterURL: result.posterURL,
-      hlsPrefix: result.hlsPrefix,
-    });
-  } catch (error) {
-    console.error("[uploads/process-video]", error);
-    res.status(500).json({
-      error: error.message ?? "Video processing failed",
-    });
   }
-});
+);
 
 /** @deprecated İstemci signed URL kullanmalı. Geriye dönük uyumluluk. */
-router.post("/uploads", verifyAuth, async (req, res) => {
+router.post("/uploads", verifyAuth, uploadRateLimit, async (req, res) => {
   console.warn(
     "[uploads] Deprecated base64 proxy upload — migrate client to POST /uploads/sign"
   );

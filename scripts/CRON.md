@@ -39,10 +39,18 @@ Başarılı çıktı örneği: `[rebuild-rankings] Done.`
 crontab -e
 ```
 
-Ekleyin (node yolunu `which node` ile doğrulayın):
+Ekleyin (node yolunu `which node` ile doğrulayın). Sunucu UTC ise `CRON_TZ` satırı şart; aksi halde job 03:00 İstanbul’da çalışır:
 
 ```cron
-0 0 * * * cd /root/myrankapp && TZ=Europe/Istanbul /usr/bin/node scripts/rebuild-rankings.js >> /root/myrankapp/logs/rebuild-rankings.log 2>&1 # myrankapp-rebuild-rankings
+CRON_TZ=Europe/Istanbul
+0 0 * * * cd /root/myrankapp && /usr/bin/node scripts/rebuild-rankings.js >> /root/myrankapp/logs/rebuild-rankings.log 2>&1 # myrankapp-rebuild-rankings
+CRON_TZ=Etc/UTC
+```
+
+Alternatif (CRON_TZ desteklenmiyorsa, UTC sunucuda `0 21 * * *` = 00:00 İstanbul):
+
+```cron
+0 21 * * * cd /root/myrankapp && /usr/bin/node scripts/rebuild-rankings.js >> /root/myrankapp/logs/rebuild-rankings.log 2>&1 # myrankapp-rebuild-rankings
 ```
 
 ## Kontrol

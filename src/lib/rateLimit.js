@@ -96,7 +96,7 @@ const writeRateLimit = createRateLimiter({
 
 const uploadRateLimit = createRateLimiter({
   windowMs: 60_000,
-  max: Number(process.env.API_UPLOAD_RATE_LIMIT_PER_MINUTE) || 15,
+  max: Number(process.env.API_UPLOAD_RATE_LIMIT_PER_MINUTE) || 30,
   message: "Çok fazla yükleme isteği. Lütfen kısa süre sonra tekrar deneyin.",
 });
 
