@@ -24,7 +24,9 @@ const {
   checkAuthApi,
   checkFirestoreApi,
   checkStorageApi,
+  checkMediaProxy,
 } = require("./src/lib/healthChecks");
+const { getRedisClient, getRedisStatus } = require("./src/lib/redis");
 const rankingRoutes = require("./src/features/ranking/api/routes");
 const profileRoutes = require("./src/features/profile/api/routes");
 const uploadRoutes = require("./src/features/uploads/api/routes");
@@ -43,10 +45,14 @@ const {
   writeRateLimit,
   uploadRateLimit,
 } = require("./src/lib/rateLimit");
+const { createRequestMetricsMiddleware, getRequestMetrics } = require("./src/lib/requestMetrics");
+const { getCacheStats } = require("./src/features/feed/feedCache");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const API_TIMEOUT_MS = Number(process.env.API_TIMEOUT_MS) || 25000;
+
+void getRedisClient();
 
 app.use(
   compression({
@@ -61,6 +67,7 @@ app.use(
 );
 app.use(express.json({ limit: "25mb" }));
 
+app.use(createRequestMetricsMiddleware());
 app.use("/api", apiRateLimit);
 app.use("/api", (req, res, next) => {
   res.setTimeout(API_TIMEOUT_MS, () => {
@@ -118,16 +125,19 @@ app.get("/status", async (req, res) => {
       firebaseApp.options.projectId ||
       "unknown";
 
-    const [auth, firestore, storage] = await Promise.all([
+    const [auth, firestore, storage, mediaProxy, feedCache] = await Promise.all([
       checkAuthApi(admin),
       checkFirestoreApi(db),
       checkStorageApi(admin),
+      checkMediaProxy(),
+      getCacheStats(),
     ]);
 
     const allOk =
       auth.status === "ok" &&
       firestore.status === "ok" &&
-      storage.status === "ok";
+      storage.status === "ok" &&
+      mediaProxy.status === "ok";
 
     res.json({
       status: allOk ? "ok" : "degraded",
@@ -135,11 +145,17 @@ app.get("/status", async (req, res) => {
       authApi: auth.status,
       firestoreApi: firestore.status,
       storageApi: storage.status,
+      mediaProxy: mediaProxy.status,
+      mediaProxyCacheStatus: mediaProxy.cacheStatus,
+      redisStatus: getRedisStatus(),
       authError: auth.error,
       firestoreError: firestore.error,
       storageError: storage.error,
+      mediaProxyError: mediaProxy.error,
       projectId,
       timestamp: new Date().toISOString(),
+      metrics: getRequestMetrics(),
+      feedCache,
     });
   } catch (error) {
     res.status(500).json({

@@ -1,11 +1,18 @@
 const express = require("express");
 const { verifyAuth } = require("../../../lib/verifyAuth");
+const { feedInvalidateRateLimit } = require("../../../lib/rateLimit");
 const { filterPostsForViewer } = require("../../blocks/blockService");
 const {
   getCached,
   setCached,
   getCacheKey,
   invalidateFeedCaches,
+  FEED_RECENT_TTL_MS,
+  FEED_EXPLORE_TTL_MS,
+  FEED_FOLLOWING_TTL_MS,
+  FEED_AUTHOR_TTL_MS,
+  FEED_HASHTAG_TTL_MS,
+  FEED_SAVED_TTL_MS,
 } = require("../feedCache");
 const { attachEngagementsToFeedPage } = require("../feedEngagement");
 const { fetchSavedPostsPage } = require("../fetchSavedPosts");
@@ -22,14 +29,36 @@ const router = express.Router();
 async function buildFeedResponse(viewerId, page, cacheKey, ttlMs) {
   const filtered = await filterPostsForViewer(viewerId, page);
   const withEngagement = await attachEngagementsToFeedPage(viewerId, filtered);
-  setCached(cacheKey, withEngagement, ttlMs);
+  await setCached(cacheKey, withEngagement, ttlMs);
   return withEngagement;
 }
 
-router.post("/feed/invalidate", verifyAuth, (req, res) => {
-  invalidateFeedCaches();
-  res.json({ ok: true });
-});
+async function respondFeedPage(res, viewerId, cacheKey, ttlMs, fetchPage) {
+  const cached = await getCached(cacheKey);
+  if (cached) {
+    res.setHeader("X-Cache-Status", "HIT");
+    return res.json({ ok: true, ...cached });
+  }
+
+  const page = await buildFeedResponse(
+    viewerId,
+    await fetchPage(),
+    cacheKey,
+    ttlMs
+  );
+  res.setHeader("X-Cache-Status", "MISS");
+  return res.json({ ok: true, ...page });
+}
+
+router.post(
+  "/feed/invalidate",
+  verifyAuth,
+  feedInvalidateRateLimit,
+  async (req, res) => {
+    await invalidateFeedCaches();
+    res.json({ ok: true });
+  }
+);
 
 router.get("/feed/saved", verifyAuth, async (req, res) => {
   try {
@@ -42,17 +71,13 @@ router.get("/feed/saved", verifyAuth, async (req, res) => {
       limit ?? "",
     ]);
 
-    const cached = getCached(cacheKey);
-    if (cached) {
-      return res.json({ ok: true, ...cached });
-    }
-
-    const page = await buildFeedResponse(
+    await respondFeedPage(
+      res,
       req.user.uid,
-      await fetchSavedPostsPage({ userId: req.user.uid, limit }),
-      cacheKey
+      cacheKey,
+      FEED_SAVED_TTL_MS,
+      () => fetchSavedPostsPage({ userId: req.user.uid, limit })
     );
-    res.json({ ok: true, ...page });
   } catch (error) {
     res.status(500).json({
       error: error.message ?? "Saved feed request failed",
@@ -74,17 +99,13 @@ router.get("/feed/recent", verifyAuth, async (req, res) => {
       limit ?? "",
     ]);
 
-    const cached = getCached(cacheKey);
-    if (cached) {
-      return res.json({ ok: true, ...cached });
-    }
-
-    const page = await buildFeedResponse(
+    await respondFeedPage(
+      res,
       req.user.uid,
-      await fetchRecentFeedPage({ cursor, limit }),
-      cacheKey
+      cacheKey,
+      FEED_RECENT_TTL_MS,
+      () => fetchRecentFeedPage({ cursor, limit })
     );
-    res.json({ ok: true, ...page });
   } catch (error) {
     res.status(500).json({
       error: error.message ?? "Feed recent request failed",
@@ -106,22 +127,18 @@ router.get("/feed/following", verifyAuth, async (req, res) => {
       limit ?? "",
     ]);
 
-    const cached = getCached(cacheKey);
-    if (cached) {
-      return res.json({ ok: true, ...cached });
-    }
-
-    const page = await buildFeedResponse(
+    await respondFeedPage(
+      res,
       req.user.uid,
-      await fetchFollowingFeedPage({
-        userId: req.user.uid,
-        cursor,
-        limit,
-      }),
       cacheKey,
-      120_000
+      FEED_FOLLOWING_TTL_MS,
+      () =>
+        fetchFollowingFeedPage({
+          userId: req.user.uid,
+          cursor,
+          limit,
+        })
     );
-    res.json({ ok: true, ...page });
   } catch (error) {
     res.status(500).json({
       error: error.message ?? "Feed following request failed",
@@ -145,17 +162,13 @@ router.get("/feed/author/:authorId", verifyAuth, async (req, res) => {
       limit ?? "",
     ]);
 
-    const cached = getCached(cacheKey);
-    if (cached) {
-      return res.json({ ok: true, ...cached });
-    }
-
-    const page = await buildFeedResponse(
+    await respondFeedPage(
+      res,
       req.user.uid,
-      await fetchAuthorFeedPage({ authorId, cursor, limit }),
-      cacheKey
+      cacheKey,
+      FEED_AUTHOR_TTL_MS,
+      () => fetchAuthorFeedPage({ authorId, cursor, limit })
     );
-    res.json({ ok: true, ...page });
   } catch (error) {
     res.status(500).json({
       error: error.message ?? "Feed author request failed",
@@ -179,17 +192,13 @@ router.get("/feed/hashtag/:tag", verifyAuth, async (req, res) => {
       limit ?? "",
     ]);
 
-    const cached = getCached(cacheKey);
-    if (cached) {
-      return res.json({ ok: true, ...cached });
-    }
-
-    const page = await buildFeedResponse(
+    await respondFeedPage(
+      res,
       req.user.uid,
-      await fetchHashtagFeedPage({ tag, cursor, limit }),
-      cacheKey
+      cacheKey,
+      FEED_HASHTAG_TTL_MS,
+      () => fetchHashtagFeedPage({ tag, cursor, limit })
     );
-    res.json({ ok: true, ...page });
   } catch (error) {
     res.status(500).json({
       error: error.message ?? "Feed hashtag request failed",
@@ -236,22 +245,19 @@ router.get("/feed/explore", verifyAuth, async (req, res) => {
       limit ?? "",
     ]);
 
-    const cached = getCached(cacheKey);
-    if (cached) {
-      return res.json({ ok: true, ...cached });
-    }
-
-    const page = await buildFeedResponse(
+    await respondFeedPage(
+      res,
       req.user.uid,
-      await fetchExploreFeedPage({
-        segmentKey,
-        filters,
-        cursor,
-        limit,
-      }),
-      cacheKey
+      cacheKey,
+      FEED_EXPLORE_TTL_MS,
+      () =>
+        fetchExploreFeedPage({
+          segmentKey,
+          filters,
+          cursor,
+          limit,
+        })
     );
-    res.json({ ok: true, ...page });
   } catch (error) {
     res.status(500).json({
       error: error.message ?? "Feed explore request failed",

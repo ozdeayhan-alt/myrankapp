@@ -10,7 +10,7 @@ const {
 } = require("../../notifications/createNotification");
 const { resolveMentions } = require("../resolveMentions");
 const { notifyMentions } = require("../notifyMentions");
-const { fanOutPostById } = require("../../feed/userFeedService");
+const { enqueueFanOut } = require("../../../lib/jobQueue");
 const { fetchPostById } = require("../../profile/fetchProfileSummary");
 const { invalidateFeedCachesForPost } = require("../../feed/feedCache");
 
@@ -52,8 +52,8 @@ router.post("/posts/:postId/fan-out", verifyAuth, async (req, res) => {
       return res.status(403).json({ error: "Bu gönderi size ait değil" });
     }
 
-    const fanOut = await fanOutPostById(postId);
-    invalidateFeedCachesForPost({
+    const fanOut = await enqueueFanOut(postId);
+    await invalidateFeedCachesForPost({
       authorId: post.authorId,
       segmentKey: post.segmentKey,
       hashtags: [],

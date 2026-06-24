@@ -99,6 +99,28 @@ async function main() {
     );
   } else {
     log(`API ${API_URL}: ok`);
+    if (api.body?.mediaProxy && api.body.mediaProxy !== "ok") {
+      failures.push(`Media proxy degraded (status=${api.body.mediaProxy})`);
+    } else if (api.body?.mediaProxy === "ok") {
+      log(`Media proxy: ok (cache=${api.body.mediaProxyCacheStatus ?? "n/a"})`);
+    }
+    if (api.body?.redisStatus && api.body.redisStatus !== "connected") {
+      failures.push(`Redis not connected (status=${api.body.redisStatus})`);
+    } else if (api.body?.redisStatus === "connected") {
+      log("Redis: connected");
+    }
+    const apiRequests = api.body?.metrics?.apiRequests;
+    const alertThreshold = Number(process.env.FIRESTORE_USAGE_ALERT_API_REQUESTS);
+    if (
+      Number.isFinite(alertThreshold) &&
+      alertThreshold > 0 &&
+      typeof apiRequests === "number" &&
+      apiRequests > alertThreshold
+    ) {
+      failures.push(
+        `API request volume high since restart (${apiRequests} > ${alertThreshold})`
+      );
+    }
   }
 
   const stagingPm2 = checkPm2App(STAGING_PM2_APP);

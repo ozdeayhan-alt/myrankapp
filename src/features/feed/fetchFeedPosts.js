@@ -79,6 +79,9 @@ async function fetchExploreFeedPage({
   const pageSize = Math.min(Math.max(Number(limit) || DEFAULT_LIMIT, 1), 50);
   let queryRef = db.collection("posts");
 
+  const exploreOrderField =
+    process.env.EXPLORE_ORDER_BY === "postScore" ? "postScore" : "createdAt";
+
   const metadataFilters = filters && typeof filters === "object" ? filters : null;
   const hasSegmentKey =
     segmentKey && typeof segmentKey === "string" && segmentKey.trim().length > 0;
@@ -86,7 +89,7 @@ async function fetchExploreFeedPage({
   if (hasSegmentKey) {
     queryRef = queryRef
       .where("segmentKey", "==", segmentKey.trim())
-      .orderBy("postScore", "desc");
+      .orderBy(exploreOrderField, "desc");
   } else if (metadataFilters) {
     if (metadataFilters.country?.trim()) {
       queryRef = queryRef.where(
@@ -122,9 +125,9 @@ async function fetchExploreFeedPage({
         metadataFilters.maritalStatus.trim()
       );
     }
-    queryRef = queryRef.orderBy("postScore", "desc");
+    queryRef = queryRef.orderBy(exploreOrderField, "desc");
   } else {
-    queryRef = queryRef.orderBy("postScore", "desc");
+    queryRef = queryRef.orderBy(exploreOrderField, "desc");
   }
 
   queryRef = queryRef.limit(pageSize);
@@ -138,7 +141,7 @@ async function fetchExploreFeedPage({
   }
 
   const snap = await queryRef.get();
-  return buildPageResult(snap.docs, pageSize, "postScore");
+  return buildPageResult(snap.docs, pageSize, exploreOrderField);
 }
 
 const MAX_FOLLOWING_AUTHORS = 100;
@@ -158,7 +161,7 @@ function chunkArray(items, size) {
 }
 
 async function getFollowingAuthorIds(userId) {
-  const cached = getFollowingAuthorsCached(userId);
+  const cached = await getFollowingAuthorsCached(userId);
   if (cached) {
     return cached;
   }
@@ -174,7 +177,7 @@ async function getFollowingAuthorIds(userId) {
     .map((doc) => doc.data().targetUserId)
     .filter((id) => typeof id === "string" && id.trim().length > 0);
 
-  setFollowingAuthorsCached(userId, authorIds);
+  await setFollowingAuthorsCached(userId, authorIds);
   return authorIds;
 }
 
@@ -345,6 +348,9 @@ async function fetchFollowingFeedFromUserFeeds({
   };
 }
 
+const USE_USER_FEEDS_ONLY =
+  process.env.FOLLOWING_FEED_USER_FEEDS_ONLY === "true";
+
 async function fetchFollowingFeedPage({
   userId,
   cursor,
@@ -355,6 +361,10 @@ async function fetchFollowingFeedPage({
     cursor,
     limit,
   });
+
+  if (USE_USER_FEEDS_ONLY) {
+    return userFeedPage;
+  }
 
   if (userFeedPage.posts.length > 0 || cursor) {
     return userFeedPage;

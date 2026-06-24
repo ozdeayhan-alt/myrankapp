@@ -31,7 +31,7 @@ router.get("/profile/:userId/summary", verifyAuth, async (req, res) => {
       limit,
     ]);
 
-    const cached = getCached(cacheKey);
+    const cached = await getCached(cacheKey);
     if (cached) {
       return res.json({ ok: true, ...cached });
     }
@@ -50,7 +50,7 @@ router.get("/profile/:userId/summary", verifyAuth, async (req, res) => {
       postsPage,
     };
 
-    setCached(cacheKey, payload, 60_000);
+    await setCached(cacheKey, payload, 60_000);
     res.json({ ok: true, ...payload });
   } catch (error) {
     res.status(500).json({

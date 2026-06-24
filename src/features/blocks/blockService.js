@@ -5,7 +5,7 @@ const { getCached, setCached, invalidateCached, getCacheKey } = require("../feed
 
 function invalidateBlockedUserCache(userId) {
   if (!userId) return;
-  invalidateCached(getCacheKey(["blocks", userId]));
+  void invalidateCached(getCacheKey(["blocks", userId]));
 }
 
 async function getBlockedUserIds(userId) {
@@ -14,9 +14,9 @@ async function getBlockedUserIds(userId) {
   }
 
   const cacheKey = getCacheKey(["blocks", userId]);
-  const cached = getCached(cacheKey);
+  const cached = await getCached(cacheKey);
   if (cached) {
-    return cached;
+    return cached instanceof Set ? cached : new Set(cached);
   }
 
   const [blockedByMeSnap, blockedMeSnap] = await Promise.all([
@@ -40,7 +40,7 @@ async function getBlockedUserIds(userId) {
     }
   }
 
-  setCached(cacheKey, blocked);
+  await setCached(cacheKey, blocked);
   return blocked;
 }
 

@@ -107,6 +107,14 @@ const voteRateLimit = createRateLimiter({
   message: "Çok fazla oy isteği. Lütfen kısa süre sonra tekrar deneyin.",
 });
 
+/** POST /feed/invalidate — pull-to-refresh cache bust spam koruması. */
+const feedInvalidateRateLimit = createRateLimiter({
+  windowMs: 60_000,
+  max: Number(process.env.FEED_INVALIDATE_RATE_LIMIT_PER_MINUTE) || 10,
+  message: "Çok fazla feed yenileme isteği. Lütfen kısa süre sonra tekrar deneyin.",
+  methods: new Set(["POST"]),
+});
+
 module.exports = {
   createRateLimiter,
   normalizePath,
@@ -117,4 +125,5 @@ module.exports = {
   writeRateLimit,
   uploadRateLimit,
   voteRateLimit,
+  feedInvalidateRateLimit,
 };

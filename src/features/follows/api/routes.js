@@ -58,7 +58,7 @@ router.get("/follows/:targetUserId/status", verifyAuth, async (req, res) => {
 router.post("/follows/:targetUserId", verifyAuth, async (req, res) => {
   try {
     const result = await followUser(req.user.uid, req.params.targetUserId);
-    invalidateFollowingAuthors(req.user.uid);
+    await invalidateFollowingAuthors(req.user.uid);
     res.json(result);
   } catch (error) {
     mapFollowError(error, res);
@@ -68,7 +68,7 @@ router.post("/follows/:targetUserId", verifyAuth, async (req, res) => {
 router.delete("/follows/:targetUserId", verifyAuth, async (req, res) => {
   try {
     const result = await unfollowUser(req.user.uid, req.params.targetUserId);
-    invalidateFollowingAuthors(req.user.uid);
+    await invalidateFollowingAuthors(req.user.uid);
     res.json(result);
   } catch (error) {
     mapFollowError(error, res);

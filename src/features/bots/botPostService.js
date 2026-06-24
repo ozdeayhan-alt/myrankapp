@@ -4,7 +4,7 @@ const { buildSegmentKey } = require("../../lib/segmentKey");
 const { postImageUrl } = require("./botPersonas");
 const { toDate } = require("./botUtils");
 const { invalidateFeedCachesForPost } = require("../feed/feedCache");
-const { fanOutPostToFollowers } = require("../feed/userFeedService");
+const { enqueueFanOutDirect } = require("../../lib/jobQueue");
 
 async function getUserPostContext(authorId) {
   const userSnap = await db.collection("users").doc(authorId).get();
@@ -83,7 +83,7 @@ async function createBotPost({
   const ref = await db.collection("posts").add(payload);
   const createdAtMillis = payload.createdAt?.toMillis?.() ?? Date.now();
 
-  void fanOutPostToFollowers({
+  void enqueueFanOutDirect({
     postId: ref.id,
     authorId: ctx.authorId,
     createdAtMillis,
@@ -91,7 +91,7 @@ async function createBotPost({
     console.error("[createBotPost] fan-out failed:", error.message ?? error);
   });
 
-  invalidateFeedCachesForPost({
+  await invalidateFeedCachesForPost({
     authorId: ctx.authorId,
     segmentKey: ctx.segmentKey,
     hashtags: [],

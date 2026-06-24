@@ -69,7 +69,7 @@ async function deletePost(postId, userId) {
 
   await removePostFromUserFeeds(postId);
 
-  invalidateFeedCachesForPost({
+  await invalidateFeedCachesForPost({
     authorId,
     segmentKey: data.segmentKey,
     hashtags: Array.isArray(data.hashtags) ? data.hashtags : [],

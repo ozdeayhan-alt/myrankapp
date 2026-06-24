@@ -3,7 +3,7 @@ const { db } = require("../../lib/firestore");
 const { buildSegmentKey, EMPTY_METADATA } = require("../../lib/segmentKey");
 const { applyInteraction } = require("../ranking/engine/applyInteraction");
 const { invalidateFeedCachesForPost } = require("../feed/feedCache");
-const { fanOutPostById } = require("../feed/userFeedService");
+const { enqueueFanOut } = require("../../lib/jobQueue");
 const { PostError } = require("./postErrors");
 const { CAPTION_MAX_LENGTH } = require("./updatePostContent");
 
@@ -142,11 +142,11 @@ async function repostPost(originalPostId, actorId, caption) {
     console.error("[repostPost] share interaction failed:", err.message ?? err);
   }
 
-  void fanOutPostById(repostRef.id).catch((error) => {
+  void enqueueFanOut(repostRef.id).catch((error) => {
     console.error("[repostPost] fan-out failed:", error.message ?? error);
   });
 
-  invalidateFeedCachesForPost({
+  await invalidateFeedCachesForPost({
     authorId: actorId,
     segmentKey,
     hashtags: [],
