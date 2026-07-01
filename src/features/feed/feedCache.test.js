@@ -2,9 +2,9 @@ const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
 
 describe("feedCache", () => {
-  it("uses default TTL of 180s when env unset", async () => {
+  it("uses default TTL of 240s when env unset", async () => {
     const { CACHE_TTL_MS, setCached, getCached, getCacheKey } = loadFresh();
-    assert.equal(CACHE_TTL_MS, 180_000);
+    assert.equal(CACHE_TTL_MS, 240_000);
 
     const key = getCacheKey(["feed", "recent", "u1", "", "15"]);
     await setCached(key, { posts: [] });
@@ -33,8 +33,8 @@ describe("feedCache", () => {
     assert.equal(stats.feedEntries, 2);
     assert.equal(stats.feedByKind.recent, 1);
     assert.equal(stats.feedByKind.explore, 1);
-    assert.equal(stats.ttlMs.recent, 180_000);
-    assert.equal(stats.ttlMs.explore, 300_000);
+    assert.equal(stats.ttlMs.recent, 360_000);
+    assert.equal(stats.ttlMs.explore, 600_000);
     assert.equal(stats.backend, "memory");
   });
 });

@@ -3,6 +3,7 @@ const { db } = require("../../lib/firestore");
 const { sanitizeCaption } = require("./sanitizeCaption");
 const { StoryError } = require("./storyErrors");
 const { resolveUserPublic } = require("../messages/resolveUserPublic");
+const { assertAllowedMediaURL } = require("../../lib/validateMediaUrl");
 
 const STORY_TTL_MS = 24 * 60 * 60 * 1000;
 const MAX_STORIES_PER_DAY = 5;
@@ -14,14 +15,11 @@ function assertMediaType(value) {
 }
 
 function assertMediaUrl(value, label) {
-  if (!value || typeof value !== "string" || !value.trim()) {
-    throw new StoryError(400, `${label} gerekli`);
+  try {
+    return assertAllowedMediaURL(value, label);
+  } catch (error) {
+    throw new StoryError(error.statusCode ?? 400, error.message);
   }
-  const url = value.trim();
-  if (!/^https?:\/\//i.test(url)) {
-    throw new StoryError(400, "Geçersiz medya adresi");
-  }
-  return url;
 }
 
 async function countRecentStories(userId) {
@@ -73,6 +71,11 @@ async function createStory(userId, input) {
     caption,
     createdAt: now,
     expiresAt,
+    viewCount: 0,
+    heartLikeCount: 0,
+    likeCount: 0,
+    dislikeCount: 0,
+    storyScore: 0,
   };
 
   const ref = await db.collection("stories").add(doc);

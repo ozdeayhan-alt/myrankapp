@@ -2,6 +2,10 @@ const { admin, db } = require("../../lib/firestore");
 const { deletePostMedia } = require("../posts/deletePostMedia");
 const { deleteObjectsByPrefix } = require("../../lib/storageMedia");
 const { getOtherParticipantId } = require("../messages/conversationId");
+const {
+  getRankingSegmentKeys,
+  GLOBAL_RANKING_SEGMENT,
+} = require("../../lib/segmentKey");
 
 const BATCH_SIZE = 300;
 
@@ -54,9 +58,33 @@ async function deleteUserPosts(userId) {
 }
 
 async function deleteRankingEntries(userId) {
-  const entriesSnap = await db.collectionGroup("entries").get();
-  const toDelete = entriesSnap.docs.filter((doc) => doc.id === userId);
-  return deleteDocuments(toDelete);
+  const userSnap = await db.collection("users").doc(userId).get();
+  const segmentKeys = new Set([GLOBAL_RANKING_SEGMENT]);
+
+  if (userSnap.exists) {
+    const metadata = userSnap.data()?.metadata;
+    for (const segmentKey of getRankingSegmentKeys(metadata)) {
+      segmentKeys.add(segmentKey);
+    }
+  }
+
+  let deleted = 0;
+  await Promise.all(
+    [...segmentKeys].map(async (segmentKey) => {
+      const ref = db
+        .collection("rankings")
+        .doc(segmentKey)
+        .collection("entries")
+        .doc(userId);
+      const snap = await ref.get();
+      if (snap.exists) {
+        await ref.delete();
+        deleted += 1;
+      }
+    })
+  );
+
+  return deleted;
 }
 
 async function deleteUserConversations(userId) {
@@ -121,6 +149,9 @@ async function deleteAccount(userId) {
     deleteQuery(
       db.collection("profileVoteBatches").where("targetUserId", "==", userId)
     ),
+    deleteQuery(db.collection("actorStoryEngagements").where("actorId", "==", userId)),
+    deleteQuery(db.collection("storyVoteBatches").where("actorId", "==", userId)),
+    deleteQuery(db.collection("storyVoteBatches").where("authorId", "==", userId)),
   ]);
 
   await deleteRankingEntries(userId);

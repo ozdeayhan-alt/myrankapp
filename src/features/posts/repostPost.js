@@ -2,6 +2,7 @@ const { FieldValue } = require("firebase-admin/firestore");
 const { db } = require("../../lib/firestore");
 const { buildSegmentKey, EMPTY_METADATA } = require("../../lib/segmentKey");
 const { applyInteraction } = require("../ranking/engine/applyInteraction");
+const { afterAuthorScoreChange } = require("../ranking/rankingScoreSync");
 const { invalidateFeedCachesForPost } = require("../feed/feedCache");
 const { enqueueFanOut } = require("../../lib/jobQueue");
 const { PostError } = require("./postErrors");
@@ -138,6 +139,7 @@ async function repostPost(originalPostId, actorId, caption) {
       actorId,
       type: "share",
     });
+    afterAuthorScoreChange(shareResult.authorId, shareResult.scoreDelta);
   } catch (err) {
     console.error("[repostPost] share interaction failed:", err.message ?? err);
   }

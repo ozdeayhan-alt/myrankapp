@@ -2,9 +2,11 @@ const { FieldValue } = require("firebase-admin/firestore");
 const { db } = require("../../lib/firestore");
 const { buildConversationId, getOtherParticipantId } = require("./conversationId");
 const { MessageError } = require("./messageErrors");
-const { resolveUserPublic } = require("./resolveUserPublic");
+const { resolveUsersPublic } = require("./resolveUserPublic");
 const { assertUsersCanInteract } = require("../blocks/blockService");
 const { createNotification } = require("../notifications/createNotification");
+const { assertAllowedMediaURL } = require("../../lib/validateMediaUrl");
+const { invalidateInboxCacheQuiet } = require("./inboxCache");
 
 const MESSAGE_MAX_LENGTH = 2000;
 const MESSAGE_TYPES = new Set(["text", "image", "video"]);
@@ -64,8 +66,19 @@ async function openConversation(actorId, targetUserId) {
 
   const conversationId = buildConversationId(actorId, targetUserId);
   const conversationRef = db.collection("conversations").doc(conversationId);
-  const actorPublic = await resolveUserPublic(actorId);
-  const targetPublic = await resolveUserPublic(targetUserId);
+  const profiles = await resolveUsersPublic([actorId, targetUserId]);
+  const actorPublic =
+    profiles.get(actorId) ?? {
+      userId: actorId,
+      displayName: "Kullanıcı",
+      photoURL: undefined,
+    };
+  const targetPublic =
+    profiles.get(targetUserId) ?? {
+      userId: targetUserId,
+      displayName: "Kullanıcı",
+      photoURL: undefined,
+    };
 
   const conversationSnap = await conversationRef.get();
   const existingLastText = conversationSnap.exists
@@ -114,6 +127,9 @@ async function openConversation(actorId, targetUserId) {
     { merge: true }
   );
 
+  invalidateInboxCacheQuiet(actorId);
+  invalidateInboxCacheQuiet(targetUserId);
+
   return {
     ok: true,
     conversationId,
@@ -139,6 +155,18 @@ async function sendMessage(actorId, conversationId, payload = {}) {
     if (!mediaURL) {
       throw new MessageError(400, "mediaURL gerekli");
     }
+    try {
+      assertAllowedMediaURL(mediaURL, "mediaURL");
+    } catch (error) {
+      throw new MessageError(error.statusCode ?? 400, error.message);
+    }
+    if (posterURL) {
+      try {
+        assertAllowedMediaURL(posterURL, "posterURL");
+      } catch (error) {
+        throw new MessageError(error.statusCode ?? 400, error.message);
+      }
+    }
     if (payload.text != null && String(payload.text).trim()) {
       normalizedText = normalizeText(payload.text);
     }
@@ -159,8 +187,19 @@ async function sendMessage(actorId, conversationId, payload = {}) {
 
   const conversationRef = db.collection("conversations").doc(conversationId);
   const messageRef = conversationRef.collection("messages").doc();
-  const actorPublic = await resolveUserPublic(actorId);
-  const otherPublic = await resolveUserPublic(otherUserId);
+  const profiles = await resolveUsersPublic([actorId, otherUserId]);
+  const actorPublic =
+    profiles.get(actorId) ?? {
+      userId: actorId,
+      displayName: "Kullanıcı",
+      photoURL: undefined,
+    };
+  const otherPublic =
+    profiles.get(otherUserId) ?? {
+      userId: otherUserId,
+      displayName: "Kullanıcı",
+      photoURL: undefined,
+    };
 
   const messageData = {
     senderId: actorId,
@@ -219,6 +258,9 @@ async function sendMessage(actorId, conversationId, payload = {}) {
     );
   });
 
+  invalidateInboxCacheQuiet(actorId);
+  invalidateInboxCacheQuiet(otherUserId);
+
   void createNotification({
     recipientId: otherUserId,
     actorId,
@@ -260,6 +302,8 @@ async function markConversationRead(actorId, conversationId) {
     { unreadCount: 0, updatedAt: FieldValue.serverTimestamp() },
     { merge: true }
   );
+
+  invalidateInboxCacheQuiet(actorId);
 
   return { ok: true, conversationId };
 }

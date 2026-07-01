@@ -5,7 +5,7 @@ const { configureNetworkDns } = require("./src/lib/configureNetworkDns");
 configureNetworkDns();
 
 const { dequeueJob, processJob } = require("./src/lib/jobQueue");
-const { getRedisStatus } = require("./src/lib/redis");
+const { getRedisClient, getRedisStatus, isRedisRequired } = require("./src/lib/redis");
 
 const IDLE_SLEEP_MS = Number(process.env.WORKER_IDLE_SLEEP_MS) || 1_000;
 
@@ -14,6 +14,12 @@ function sleep(ms) {
 }
 
 async function runWorkerLoop() {
+  const redis = await getRedisClient();
+  if (!redis && isRedisRequired()) {
+    console.error("[worker] Redis is required but unavailable — exiting");
+    process.exit(1);
+  }
+
   console.log(`[worker] started redisStatus=${getRedisStatus()}`);
 
   while (true) {

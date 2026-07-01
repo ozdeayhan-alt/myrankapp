@@ -1,5 +1,10 @@
-const { getRedisClient, isRedisEnabled } = require("./redis");
+const { getRedisClient, isRedisRequired } = require("./redis");
 const { fanOutPostById, fanOutPostToFollowers } = require("../features/feed/userFeedService");
+const { processVideoUploadWithFallback } = require("../features/uploads/processVideo");
+const {
+  markVideoJobComplete,
+  markVideoJobFailed,
+} = require("../features/uploads/videoJobStore");
 
 const QUEUE_KEY = process.env.JOB_QUEUE_KEY?.trim() || "myrank:jobs";
 
@@ -21,6 +26,28 @@ async function processJob(job) {
       });
       return { type: job.type, postId: job.postId, ...result };
     }
+    case "processVideo": {
+      try {
+        const result = await processVideoUploadWithFallback(job.storagePath);
+        if (job.jobId) {
+          await markVideoJobComplete(job.jobId, result);
+        }
+        return {
+          type: job.type,
+          jobId: job.jobId,
+          storagePath: job.storagePath,
+          ...result,
+        };
+      } catch (error) {
+        if (job.jobId) {
+          await markVideoJobFailed(
+            job.jobId,
+            error?.message ?? "Video processing failed"
+          );
+        }
+        throw error;
+      }
+    }
     default:
       throw new Error(`Unknown job type: ${job.type}`);
   }
@@ -33,10 +60,11 @@ async function enqueueJob(job) {
     return { queued: true };
   }
 
-  if (isRedisEnabled()) {
-    console.warn("[jobQueue] Redis unavailable, processing inline:", job.type);
+  if (isRedisRequired()) {
+    throw new Error("Job queue unavailable: Redis is required");
   }
 
+  console.warn("[jobQueue] Redis unavailable, processing inline (dev):", job.type);
   const result = await processJob(job);
   return { queued: false, ...result };
 }
@@ -51,6 +79,15 @@ async function enqueueFanOutDirect({ postId, authorId, createdAtMillis }) {
     postId,
     authorId,
     createdAtMillis,
+  });
+}
+
+async function enqueueProcessVideo({ jobId, storagePath, userId }) {
+  return enqueueJob({
+    type: "processVideo",
+    jobId,
+    storagePath,
+    userId,
   });
 }
 
@@ -73,6 +110,7 @@ module.exports = {
   enqueueJob,
   enqueueFanOut,
   enqueueFanOutDirect,
+  enqueueProcessVideo,
   dequeueJob,
   processJob,
 };

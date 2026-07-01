@@ -6,6 +6,7 @@ const {
   parseDelta,
   MAX_PROFILE_VOTE_DELTA,
 } = require("./applyProfileVoteBatch");
+const { assertNotSelfVote } = require("../voteErrors");
 
 const MAX_POST_VOTE_DELTA = MAX_PROFILE_VOTE_DELTA;
 
@@ -97,6 +98,8 @@ async function applyPostVoteBatch({ actorId, postId, delta: rawDelta }) {
 
     const post = postSnap.data();
     const authorId = post.authorId;
+    assertNotSelfVote(actorId, authorId);
+
     const userRef = db.collection("users").doc(authorId);
     const userSnap = await transaction.get(userRef);
     const engRef = db.collection("actorEngagements").doc(actorDocId(actorId, postId));

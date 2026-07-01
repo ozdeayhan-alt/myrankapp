@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
- * Rebuild rankings/{segmentKey}/entries from users.totalScore.
- * Schedule: 00:00 Europe/Istanbul (see package.json / crontab).
+ * Rebuild rankings/{segmentKey}/entries ranks.
+ * Default: incremental rank recalc from existing entries (no full users scan).
+ * Full rebuild: RANKING_FULL_REBUILD=true (weekly integrity / new segment entries).
  *
  * Usage: node scripts/rebuild-rankings.js
  */
@@ -15,9 +16,15 @@ const {
   buildSegmentKey,
 } = require("../src/lib/segmentKey");
 const { DEFAULT_DISPLAY_NAME } = require("../src/features/ranking/engine/updateRankings");
+const {
+  recalculateAllSegmentRanks,
+  writeRankedSegmentEntries,
+} = require("../src/features/ranking/engine/recalculateSegmentRanks");
+const { syncDirtyUsersFromFirestore } = require("../src/features/ranking/rankingScoreSync");
+const { clearRankingDirty } = require("../src/features/ranking/rankingDirtyService");
 
 const USERS_PAGE = 500;
-const WRITE_BATCH = 400;
+const FULL_REBUILD = process.env.RANKING_FULL_REBUILD === "true";
 
 async function fetchAllUsers() {
   const users = [];
@@ -123,121 +130,71 @@ function buildSegmentBuckets(users) {
   return buckets;
 }
 
-function computeTrendLabel(rankChange) {
-  if (rankChange == null) return null;
-  if (rankChange >= 20) return "rising";
-  if (rankChange <= -20) return "falling";
-  return "stable";
-}
-
-function computeMomentum(existingData, currentRank, currentTotalScore) {
-  const previousRank =
-    typeof existingData?.rank === "number" ? existingData.rank : null;
-  const previousTotalScore =
-    typeof existingData?.totalScore === "number"
-      ? existingData.totalScore
-      : null;
-
-  const rankChange =
-    previousRank != null ? previousRank - currentRank : null;
-  const tpChange =
-    previousTotalScore != null
-      ? currentTotalScore - previousTotalScore
-      : null;
-
-  return {
-    previousRank,
-    rankChange,
-    previousTotalScore,
-    tpChange,
-    trendLabel: computeTrendLabel(rankChange),
-  };
-}
-
-async function writeSegmentEntries(segmentKey, entries) {
+async function writeSegmentEntriesFromUsers(segmentKey, entries) {
   const sorted = [...entries].sort((a, b) => b.totalScore - a.totalScore);
-  const segmentTotal = sorted.length;
-
-  for (let i = 0; i < sorted.length; i += WRITE_BATCH) {
-    const chunk = sorted.slice(i, i + WRITE_BATCH);
-
-    const entryRefs = chunk.map((entry) =>
-      db
-        .collection("rankings")
-        .doc(segmentKey)
-        .collection("entries")
-        .doc(entry.userId)
-    );
-    const existingSnaps = await db.getAll(...entryRefs);
-    const existingByUserId = new Map();
-    for (const snap of existingSnaps) {
-      if (snap.exists) {
-        existingByUserId.set(snap.id, snap.data());
-      }
-    }
-
-    const batch = db.batch();
-
-    chunk.forEach((entry, chunkIndex) => {
-      const globalIndex = i + chunkIndex;
-      const currentRank = globalIndex + 1;
-      const aheadEntry = globalIndex > 0 ? sorted[globalIndex - 1] : null;
-      const behindEntry =
-        globalIndex < sorted.length - 1 ? sorted[globalIndex + 1] : null;
-      const entryRef = entryRefs[chunkIndex];
-      const existing = existingByUserId.get(entry.userId);
-      const momentum = computeMomentum(
-        existing,
-        currentRank,
-        entry.totalScore
-      );
-
-      batch.set(entryRef, {
-        userId: entry.userId,
-        totalScore: entry.totalScore,
-        displayName: entry.displayName,
-        photoURL: entry.photoURL ?? "",
-        metadata: entry.metadata ?? {},
-        rank: currentRank,
-        segmentTotal,
-        aheadRank: aheadEntry ? currentRank - 1 : null,
-        aheadTotalScore: aheadEntry ? aheadEntry.totalScore : null,
-        behindRank: behindEntry ? currentRank + 1 : null,
-        behindTotalScore: behindEntry ? behindEntry.totalScore : null,
-        ...momentum,
-        momentumUpdatedAt: FieldValue.serverTimestamp(),
-        updatedAt: FieldValue.serverTimestamp(),
-      });
-    });
-
-    await batch.commit();
-  }
-
-  return sorted.length;
+  return writeRankedSegmentEntries(segmentKey, sorted);
 }
 
-async function main() {
-  console.log("[rebuild-rankings] Loading users...");
+async function runFullRebuild() {
+  console.log("[rebuild-rankings] Full rebuild — loading users...");
   const users = await fetchAllUsers();
   console.log(`[rebuild-rankings] ${users.length} users`);
 
   const buckets = buildSegmentBuckets(users);
-  const rebuiltAt = FieldValue.serverTimestamp();
-
   let totalEntries = 0;
+
   for (const [segmentKey, entryMap] of buckets) {
-    const count = await writeSegmentEntries(segmentKey, [...entryMap.values()]);
+    const count = await writeSegmentEntriesFromUsers(segmentKey, [
+      ...entryMap.values(),
+    ]);
     totalEntries += count;
     console.log(`[rebuild-rankings] ${segmentKey}: ${count} entries`);
   }
+
+  return { userCount: users.length, segmentCount: buckets.size, totalEntries };
+}
+
+async function runIncrementalRebuild() {
+  console.log("[rebuild-rankings] Incremental — syncing dirty user scores...");
+  const dirtySync = await syncDirtyUsersFromFirestore();
+  console.log(
+    `[rebuild-rankings] Dirty sync: ${dirtySync.synced}/${dirtySync.total ?? 0}`
+  );
+
+  console.log("[rebuild-rankings] Recalculating segment ranks...");
+  const { segmentKeys, perSegment, totalEntries } =
+    await recalculateAllSegmentRanks();
+
+  for (const segmentKey of segmentKeys) {
+    console.log(
+      `[rebuild-rankings] ${segmentKey}: ${perSegment[segmentKey] ?? 0} entries`
+    );
+  }
+
+  await clearRankingDirty();
+
+  return {
+    userCount: null,
+    segmentCount: segmentKeys.length,
+    totalEntries,
+    mode: "incremental",
+  };
+}
+
+async function main() {
+  const rebuiltAt = FieldValue.serverTimestamp();
+  const summary = FULL_REBUILD
+    ? await runFullRebuild()
+    : await runIncrementalRebuild();
 
   await db.collection("rankingSnapshots").doc("latest").set(
     {
       rebuiltAt,
       timezone: "Europe/Istanbul",
-      userCount: users.length,
-      segmentCount: buckets.size,
-      totalEntries,
+      userCount: summary.userCount,
+      segmentCount: summary.segmentCount,
+      totalEntries: summary.totalEntries,
+      mode: FULL_REBUILD ? "full" : "incremental",
     },
     { merge: true }
   );

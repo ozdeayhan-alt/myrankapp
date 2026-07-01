@@ -1,6 +1,19 @@
 const express = require("express");
 const { verifyAuth } = require("../../../lib/verifyAuth");
 const { writeRateLimit, voteRateLimit } = require("../../../lib/rateLimit");
+const { parseFiltersFromQuery } = require("../../../lib/segmentFilters");
+const {
+  getCached,
+  setCached,
+  getCacheKey,
+} = require("../../feed/feedCache");
+const {
+  fetchRankingEntries,
+  ABSOLUTE_MAX,
+} = require("../fetchRankingEntries");
+
+const RANKING_ENTRIES_TTL_MS =
+  Number(process.env.RANKING_ENTRIES_CACHE_TTL_MS) || 90_000;
 const {
   applyInteraction,
   getEngagementStatus,
@@ -15,15 +28,55 @@ const {
   applyPostVoteBatch,
   MAX_POST_VOTE_DELTA,
 } = require("../engine/applyPostVoteBatch");
+const {
+  applyStoryVoteBatch,
+  MAX_STORY_VOTE_DELTA,
+} = require("../../stories/applyStoryVoteBatch");
 const { INTERACTION_TYPES } = require("../../../config/scoring");
 const {
   notifyPostInteraction,
   notifyProfileVotes,
   notifyPostVotes,
 } = require("../../notifications/createNotification");
+const { afterAuthorScoreChange } = require("../rankingScoreSync");
+const { mapVoteError } = require("../voteErrors");
 
 const router = express.Router();
 router.use(writeRateLimit);
+
+router.get("/ranking/entries", verifyAuth, async (req, res) => {
+  try {
+    const filters = parseFiltersFromQuery(req.query);
+    const limitRaw =
+      typeof req.query.limit === "string" ? req.query.limit : undefined;
+    const limit = Math.min(
+      Math.max(Number(limitRaw) || ABSOLUTE_MAX, 1),
+      ABSOLUTE_MAX
+    );
+
+    const cacheKey = getCacheKey([
+      "ranking",
+      "entries",
+      JSON.stringify(filters),
+      String(limit),
+    ]);
+
+    const cached = await getCached(cacheKey);
+    if (cached) {
+      res.setHeader("X-Cache-Status", "HIT");
+      return res.json({ ok: true, entries: cached });
+    }
+
+    const entries = await fetchRankingEntries(filters, limit);
+    await setCached(cacheKey, entries, RANKING_ENTRIES_TTL_MS);
+    res.setHeader("X-Cache-Status", "MISS");
+    return res.json({ ok: true, entries });
+  } catch (error) {
+    res.status(500).json({
+      error: error.message ?? "Ranking entries request failed",
+    });
+  }
+});
 
 function fireNotification(promise) {
   void promise.catch((err) => {
@@ -31,12 +84,16 @@ function fireNotification(promise) {
   });
 }
 
-function logVoteBatch({ userId, postId, targetUserId, delta }) {
+function logVoteBatch({ userId, postId, storyId, targetUserId, delta }) {
+  if (process.env.NODE_ENV === "production") {
+    return;
+  }
   console.log(
     JSON.stringify({
       event: "vote_batch",
       userId,
       ...(postId ? { postId } : {}),
+      ...(storyId ? { storyId } : {}),
       ...(targetUserId ? { targetUserId } : {}),
       delta,
       ts: new Date().toISOString(),
@@ -122,6 +179,8 @@ router.post("/profile-votes/batch", verifyAuth, voteRateLimit, async (req, res) 
       delta,
     });
 
+    afterAuthorScoreChange(targetUserId, result.scoreDelta);
+
     if (delta > 0 && targetUserId !== req.user.uid) {
       fireNotification(
         notifyProfileVotes({
@@ -134,9 +193,7 @@ router.post("/profile-votes/batch", verifyAuth, voteRateLimit, async (req, res) 
 
     res.json({ ok: true, ...result });
   } catch (error) {
-    res.status(500).json({
-      error: error.message ?? "Profile vote batch failed",
-    });
+    return mapVoteError(error, res, "Profile vote batch failed");
   }
 });
 
@@ -177,6 +234,8 @@ router.post("/post-votes/batch", verifyAuth, voteRateLimit, async (req, res) => 
       delta,
     });
 
+    afterAuthorScoreChange(result.authorId, result.scoreDelta);
+
     if (
       delta > 0 &&
       result.authorId &&
@@ -194,9 +253,52 @@ router.post("/post-votes/batch", verifyAuth, voteRateLimit, async (req, res) => 
 
     res.json({ ok: true, ...result });
   } catch (error) {
-    res.status(500).json({
-      error: error.message ?? "Post vote batch failed",
+    return mapVoteError(error, res, "Post vote batch failed");
+  }
+});
+
+router.post("/story-votes/batch", verifyAuth, voteRateLimit, async (req, res) => {
+  try {
+    const { storyId } = req.body;
+    const delta = parseDelta(req.body);
+
+    if (!storyId || typeof storyId !== "string") {
+      return res.status(400).json({ error: "storyId is required" });
+    }
+
+    if (delta === null) {
+      return res.status(400).json({
+        error: "Provide delta (number) or up/down counts",
+      });
+    }
+
+    if (delta === 0) {
+      return res.status(400).json({ error: "delta must be non-zero" });
+    }
+
+    if (Math.abs(delta) > MAX_STORY_VOTE_DELTA) {
+      return res.status(400).json({
+        error: `delta cannot exceed ${MAX_STORY_VOTE_DELTA}`,
+      });
+    }
+
+    logVoteBatch({
+      userId: req.user.uid,
+      storyId,
+      delta,
     });
+
+    const result = await applyStoryVoteBatch({
+      actorId: req.user.uid,
+      storyId,
+      delta,
+    });
+
+    afterAuthorScoreChange(result.authorId, result.scoreDelta);
+
+    res.json({ ok: true, ...result });
+  } catch (error) {
+    return mapVoteError(error, res, "Story vote batch failed");
   }
 });
 
@@ -226,6 +328,8 @@ router.post("/interactions", verifyAuth, async (req, res) => {
       type,
       commentText,
     });
+
+    afterAuthorScoreChange(result.authorId, result.scoreDelta);
 
     const actorId = req.user.uid;
     if (result.authorId && result.authorId !== actorId) {

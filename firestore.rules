@@ -23,6 +23,37 @@ service cloud.firestore {
       && data.maritalStatus is string && data.maritalStatus.size() > 0;
     }
 
+    function postCountsZero(data) {
+      return data.likeCount == 0
+        && data.dislikeCount == 0
+        && data.shareCount == 0
+        && data.saveCount == 0
+        && data.commentCount == 0;
+    }
+
+    function validPostContentType(contentType) {
+      return contentType == 'tweet'
+        || contentType == 'image'
+        || contentType == 'video';
+    }
+
+    function validPostCreate(data) {
+      return data.keys().hasAll([
+        'authorId', 'contentType', 'content', 'postScore',
+        'likeCount', 'dislikeCount', 'shareCount', 'saveCount', 'commentCount',
+        'metadata', 'segmentKey', 'createdAt'
+      ])
+        && data.authorId is string
+        && data.content is string
+        && data.content.size() <= 5000
+        && data.postScore == 0
+        && postCountsZero(data)
+        && validPostContentType(data.contentType)
+        && metadataComplete(data.metadata)
+        && data.segmentKey is string
+        && data.segmentKey.size() > 0;
+    }
+
     match /publicProfiles/{userId} {
       allow read: if isSignedIn();
       allow create: if isOwner(userId)
@@ -61,9 +92,7 @@ service cloud.firestore {
 
     match /posts/{postId} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn()
-        && request.resource.data.authorId == request.auth.uid
-        && request.resource.data.postScore == 0;
+      allow create: if false;
       allow update: if false;
     }
 
@@ -123,6 +152,28 @@ service cloud.firestore {
       allow read: if isSignedIn()
         && resource.data.expiresAt > request.time;
       allow write: if false;
+
+      match /views/{viewId} {
+        allow read: if isSignedIn()
+          && get(/databases/$(database)/documents/stories/$(storyId)).data.userId == request.auth.uid;
+        allow write: if false;
+      }
+
+      match /likes/{likeId} {
+        allow read: if isSignedIn()
+          && get(/databases/$(database)/documents/stories/$(storyId)).data.userId == request.auth.uid;
+        allow write: if false;
+      }
+    }
+
+    match /actorStoryEngagements/{engagementId} {
+      allow read: if isSignedIn()
+        && resource.data.actorId == request.auth.uid;
+      allow write: if false;
+    }
+
+    match /storyVoteBatches/{batchId} {
+      allow read, write: if false;
     }
   }
 }

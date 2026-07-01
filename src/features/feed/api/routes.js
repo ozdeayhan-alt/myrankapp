@@ -6,7 +6,7 @@ const {
   getCached,
   setCached,
   getCacheKey,
-  invalidateFeedCaches,
+  invalidateFeedCachesForUser,
   FEED_RECENT_TTL_MS,
   FEED_EXPLORE_TTL_MS,
   FEED_FOLLOWING_TTL_MS,
@@ -28,16 +28,18 @@ const router = express.Router();
 
 async function buildFeedResponse(viewerId, page, cacheKey, ttlMs) {
   const filtered = await filterPostsForViewer(viewerId, page);
-  const withEngagement = await attachEngagementsToFeedPage(viewerId, filtered);
-  await setCached(cacheKey, withEngagement, ttlMs);
-  return withEngagement;
+  const pageForCache = { ...filtered };
+  delete pageForCache.engagements;
+  await setCached(cacheKey, pageForCache, ttlMs);
+  return attachEngagementsToFeedPage(viewerId, filtered);
 }
 
 async function respondFeedPage(res, viewerId, cacheKey, ttlMs, fetchPage) {
   const cached = await getCached(cacheKey);
   if (cached) {
     res.setHeader("X-Cache-Status", "HIT");
-    return res.json({ ok: true, ...cached });
+    const withEngagement = await attachEngagementsToFeedPage(viewerId, cached);
+    return res.json({ ok: true, ...withEngagement });
   }
 
   const page = await buildFeedResponse(
@@ -55,19 +57,22 @@ router.post(
   verifyAuth,
   feedInvalidateRateLimit,
   async (req, res) => {
-    await invalidateFeedCaches();
+    await invalidateFeedCachesForUser(req.user.uid);
     res.json({ ok: true });
   }
 );
 
 router.get("/feed/saved", verifyAuth, async (req, res) => {
   try {
+    const cursor =
+      typeof req.query.cursor === "string" ? req.query.cursor : undefined;
     const limit =
       typeof req.query.limit === "string" ? req.query.limit : undefined;
     const cacheKey = getCacheKey([
       "feed",
       "saved",
       req.user.uid,
+      cursor ?? "",
       limit ?? "",
     ]);
 
@@ -76,7 +81,12 @@ router.get("/feed/saved", verifyAuth, async (req, res) => {
       req.user.uid,
       cacheKey,
       FEED_SAVED_TTL_MS,
-      () => fetchSavedPostsPage({ userId: req.user.uid, limit })
+      () =>
+        fetchSavedPostsPage({
+          userId: req.user.uid,
+          cursor,
+          limit,
+        })
     );
   } catch (error) {
     res.status(500).json({

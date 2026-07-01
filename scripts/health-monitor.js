@@ -8,6 +8,8 @@
  *   HEALTH_ALERT_WEBHOOK=https://... node scripts/health-monitor.js
  */
 
+require("dotenv").config({ path: require("path").join(__dirname, "..", ".env") });
+
 const fs = require("fs");
 const path = require("path");
 const { execSync } = require("child_process");
@@ -33,9 +35,14 @@ function log(line) {
 async function fetchStatus(url) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const statusSecret = process.env.STATUS_SECRET?.trim();
+  const headers = {};
+  if (statusSecret) {
+    headers["X-Status-Secret"] = statusSecret;
+  }
 
   try {
-    const response = await fetch(url, { signal: controller.signal });
+    const response = await fetch(url, { signal: controller.signal, headers });
     const body = await response.json().catch(() => ({}));
     return {
       ok: response.ok && body.status === "ok",

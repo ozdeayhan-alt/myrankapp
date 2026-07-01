@@ -1,6 +1,7 @@
 const { applyInteraction } = require("../ranking/engine/applyInteraction");
 const { applyPostVoteBatch } = require("../ranking/engine/applyPostVoteBatch");
 const { applyProfileVoteBatch } = require("../ranking/engine/applyProfileVoteBatch");
+const { afterAuthorScoreChange } = require("../ranking/rankingScoreSync");
 const {
   notifyPostVotes,
   notifyProfileVotes,
@@ -14,6 +15,8 @@ async function botLikePost({ botId, postId, notify = true, delta = 1 }) {
     actorId: botId,
     delta,
   });
+
+  afterAuthorScoreChange(result.authorId, result.scoreDelta);
 
   if (notify && result.authorId && result.authorId !== botId && delta > 0) {
     const targetIsBot = await isBotAccount(result.authorId);
@@ -52,6 +55,8 @@ async function botProfileBoost({ botId, targetUserId, notify = true }) {
     targetUserId,
     delta,
   });
+
+  afterAuthorScoreChange(targetUserId, result.scoreDelta);
 
   if (notify && delta > 0) {
     void notifyProfileVotes({

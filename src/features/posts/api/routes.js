@@ -4,6 +4,7 @@ const { writeRateLimit } = require("../../../lib/rateLimit");
 const { deletePost } = require("../deletePost");
 const { updatePostContent } = require("../updatePostContent");
 const { repostPost } = require("../repostPost");
+const { createPost } = require("../createPost");
 const { mapPostError } = require("../postErrors");
 const {
   createNotification,
@@ -12,10 +13,20 @@ const { resolveMentions } = require("../resolveMentions");
 const { notifyMentions } = require("../notifyMentions");
 const { enqueueFanOut } = require("../../../lib/jobQueue");
 const { fetchPostById } = require("../../profile/fetchProfileSummary");
+const { fetchPostComments } = require("../fetchPostComments");
 const { invalidateFeedCachesForPost } = require("../../feed/feedCache");
 
 const router = express.Router();
 router.use(writeRateLimit);
+
+router.post("/posts", verifyAuth, async (req, res) => {
+  try {
+    const result = await createPost(req.user.uid, req.body ?? {});
+    res.status(201).json(result);
+  } catch (error) {
+    mapPostError(error, res);
+  }
+});
 
 router.post("/posts/mentions/resolve", verifyAuth, async (req, res) => {
   try {
@@ -37,7 +48,8 @@ router.post("/posts/mentions/notify", verifyAuth, async (req, res) => {
     );
     res.json(result);
   } catch (error) {
-    res.status(400).json({ error: error.message ?? "Mention bildirimi başarısız" });
+    const status = error.statusCode === 403 ? 403 : 400;
+    res.status(status).json({ error: error.message ?? "Mention bildirimi başarısız" });
   }
 });
 
@@ -62,6 +74,19 @@ router.post("/posts/:postId/fan-out", verifyAuth, async (req, res) => {
     res.json({ ok: true, ...fanOut });
   } catch (error) {
     res.status(500).json({ error: error.message ?? "Fan-out failed" });
+  }
+});
+
+router.get("/posts/:postId/comments", verifyAuth, async (req, res) => {
+  try {
+    const limit =
+      typeof req.query.limit === "string" ? req.query.limit : undefined;
+    const comments = await fetchPostComments(req.params.postId, limit);
+    res.json({ ok: true, comments });
+  } catch (error) {
+    res.status(500).json({
+      error: error.message ?? "Post comments request failed",
+    });
   }
 });
 

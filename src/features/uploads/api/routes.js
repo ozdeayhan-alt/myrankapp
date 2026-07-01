@@ -13,6 +13,9 @@ const {
   validateContentLength,
 } = require("../uploadPathUtils");
 const { processVideoUploadWithFallback } = require("../processVideo");
+const { createVideoJob, readVideoJob } = require("../videoJobStore");
+const { enqueueProcessVideo } = require("../../../lib/jobQueue");
+const { getRedisClient, isRedisRequired } = require("../../../lib/redis");
 
 const router = express.Router();
 
@@ -141,16 +144,42 @@ router.post(
         return res.status(400).json({ error: "Only .mp4 videos can be processed" });
       }
 
-      const result = await processVideoUploadWithFallback(normalizedPath);
+      const redis = await getRedisClient();
+      if (!redis) {
+        if (isRedisRequired()) {
+          return res.status(503).json({
+            error:
+              "Video işleme geçici olarak kullanılamıyor. Lütfen biraz sonra tekrar deneyin.",
+          });
+        }
 
-      res.json({
+        const result = await processVideoUploadWithFallback(normalizedPath);
+        return res.json({
+          ok: true,
+          skipped: Boolean(result.skipped),
+          reason: result.reason,
+          hlsURL: result.hlsURL,
+          mediaURL: result.mediaURL,
+          posterURL: result.posterURL,
+          hlsPrefix: result.hlsPrefix,
+        });
+      }
+
+      const job = await createVideoJob({
+        userId: req.user.uid,
+        storagePath: normalizedPath,
+      });
+
+      await enqueueProcessVideo({
+        jobId: job.jobId,
+        storagePath: normalizedPath,
+        userId: req.user.uid,
+      });
+
+      return res.status(202).json({
         ok: true,
-        skipped: Boolean(result.skipped),
-        reason: result.reason,
-        hlsURL: result.hlsURL,
-        mediaURL: result.mediaURL,
-        posterURL: result.posterURL,
-        hlsPrefix: result.hlsPrefix,
+        jobId: job.jobId,
+        status: "pending",
       });
     } catch (error) {
       console.error("[uploads/process-video]", error);
@@ -161,8 +190,61 @@ router.post(
   }
 );
 
+router.get(
+  "/uploads/process-video/:jobId",
+  verifyAuth,
+  uploadRateLimit,
+  async (req, res) => {
+    try {
+      const job = await readVideoJob(req.params.jobId);
+      if (!job || job.userId !== req.user.uid) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+
+      if (job.status === "complete" && job.result) {
+        return res.json({
+          ok: true,
+          status: "complete",
+          skipped: Boolean(job.result.skipped),
+          reason: job.result.reason,
+          hlsURL: job.result.hlsURL,
+          mediaURL: job.result.mediaURL,
+          posterURL: job.result.posterURL,
+          hlsPrefix: job.result.hlsPrefix,
+        });
+      }
+
+      if (job.status === "failed") {
+        return res.status(500).json({
+          ok: false,
+          status: "failed",
+          error: job.error ?? "Video processing failed",
+        });
+      }
+
+      return res.json({
+        ok: true,
+        status: "pending",
+        jobId: job.jobId,
+      });
+    } catch (error) {
+      console.error("[uploads/process-video/status]", error);
+      res.status(500).json({
+        error: error.message ?? "Video job status failed",
+      });
+    }
+  }
+);
+
 /** @deprecated İstemci signed URL kullanmalı. Geriye dönük uyumluluk. */
 router.post("/uploads", verifyAuth, uploadRateLimit, async (req, res) => {
+  if (process.env.ALLOW_DEPRECATED_BASE64_UPLOADS !== "true") {
+    return res.status(410).json({
+      error:
+        "Deprecated upload endpoint disabled. Use POST /api/uploads/sign instead.",
+    });
+  }
+
   console.warn(
     "[uploads] Deprecated base64 proxy upload — migrate client to POST /uploads/sign"
   );

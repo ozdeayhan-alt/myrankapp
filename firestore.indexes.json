@@ -163,6 +163,24 @@
       ]
     },
     {
+      "collectionGroup": "posts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "metadata.country", "order": "ASCENDING" },
+        { "fieldPath": "metadata.gender", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "posts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "metadata.country", "order": "ASCENDING" },
+        { "fieldPath": "metadata.gender", "order": "ASCENDING" },
+        { "fieldPath": "postScore", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "interactions",
       "queryScope": "COLLECTION",
       "fields": [
@@ -185,6 +203,15 @@
       "fields": [
         { "fieldPath": "actorId", "order": "ASCENDING" },
         { "fieldPath": "saved", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "actorEngagements",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "actorId", "order": "ASCENDING" },
+        { "fieldPath": "saved", "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "DESCENDING" }
       ]
     },
     {
@@ -217,6 +244,15 @@
       "fields": [
         { "fieldPath": "userId", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "stories",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "expiresAt", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
     },
     {

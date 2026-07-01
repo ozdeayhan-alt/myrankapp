@@ -2,7 +2,7 @@ const { db } = require("../../lib/firestore");
 const { backfillFollowerFeed, removeAuthorFromFollowerFeed } = require("../feed/userFeedService");
 const { assertUsersCanInteract } = require("../blocks/blockService");
 const { createNotification } = require("../notifications/createNotification");
-const { resolveUserPublic } = require("../messages/resolveUserPublic");
+const { resolveUsersPublic } = require("../messages/resolveUserPublic");
 const { FollowError } = require("./followErrors");
 const { buildFollowId } = require("./followId");
 
@@ -24,18 +24,17 @@ function parseListLimit(rawLimit) {
 }
 
 async function mapFollowDocsToUsers(docs, pickUserId) {
-  return Promise.all(
-    docs.map(async (doc) => {
-      const data = doc.data();
-      const userId = pickUserId(data);
-      const profile = await resolveUserPublic(userId);
-      return {
-        userId: profile.userId,
-        displayName: profile.displayName,
-        photoURL: profile.photoURL ?? null,
-      };
-    })
-  );
+  const userIds = docs.map((doc) => pickUserId(doc.data()));
+  const profiles = await resolveUsersPublic(userIds);
+
+  return userIds.map((userId) => {
+    const profile = profiles.get(userId);
+    return {
+      userId,
+      displayName: profile?.displayName ?? "Kullanıcı",
+      photoURL: profile?.photoURL ?? null,
+    };
+  });
 }
 
 async function getFollowCounts(userId) {

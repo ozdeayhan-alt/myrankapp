@@ -29,5 +29,15 @@ for src in "${apk_files[@]}"; do
   echo "[sync-download-apks] $name -> $dest ($(stat -c '%s' "$dest") bytes)"
 done
 
+# Nginx /download/myrank.apk — dosya adı myrank-test.apk; public URL myrank.apk
+test_apk="$DOWNLOAD_DIR/myrank-test.apk"
+main_apk="$DOWNLOAD_DIR/myrank.apk"
+if [[ -f "$test_apk" ]]; then
+  cp -f "$test_apk" "$main_apk"
+  chmod 644 "$main_apk"
+  chown root:www-data "$main_apk" 2>/dev/null || true
+  echo "[sync-download-apks] myrank.apk -> $main_apk ($(stat -c '%s' "$main_apk") bytes)"
+fi
+
 chmod 755 "$DOWNLOAD_DIR"
 chown root:www-data "$DOWNLOAD_DIR" 2>/dev/null || true

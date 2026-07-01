@@ -114,6 +114,7 @@ async function checkBucketAccess(bucket) {
 }
 
 const SIGN_URL_EXPIRY_MS = 15 * 60 * 1000;
+const MESSAGE_READ_URL_EXPIRY_MS = 60 * 60 * 1000;
 
 function buildFirebaseDownloadURL(bucket, objectPath, downloadToken) {
   const encodedName = encodeURIComponent(objectPath);
@@ -145,6 +146,27 @@ async function createSignedUploadUrl({ bucket, objectPath, contentType }) {
     },
     expiresInSeconds: Math.floor(SIGN_URL_EXPIRY_MS / 1000),
   };
+}
+
+/**
+ * GCS v4 signed read URL — private message media (Storage rules deny public read).
+ */
+async function createSignedReadUrl({
+  bucket,
+  objectPath,
+  expiresMs = MESSAGE_READ_URL_EXPIRY_MS,
+}) {
+  const admin = require("../../firebase-config");
+  const bucketRef = admin.storage().bucket(bucket);
+  const file = bucketRef.file(objectPath);
+
+  const [signedUrl] = await file.getSignedUrl({
+    version: "v4",
+    action: "read",
+    expires: Date.now() + expiresMs,
+  });
+
+  return signedUrl;
 }
 
 /**
@@ -180,6 +202,8 @@ module.exports = {
   uploadBuffer,
   checkBucketAccess,
   createSignedUploadUrl,
+  createSignedReadUrl,
   finalizeUploadedObject,
   buildFirebaseDownloadURL,
+  MESSAGE_READ_URL_EXPIRY_MS,
 };

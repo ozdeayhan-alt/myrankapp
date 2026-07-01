@@ -154,6 +154,43 @@ Gece sıralama job meta (ör. son rebuild zamanı). Mobil profil accordion “So
 | caption | string | Opsiyonel, max 40 karakter |
 | createdAt | timestamp | |
 | expiresAt | timestamp | createdAt + 24h |
+| viewCount | number | Görüntülenme sayısı |
+| heartLikeCount | number | Kalp beğenisi sayısı |
+| likeCount | number | Yükselt oyları |
+| dislikeCount | number | Alçalt oyları |
+| storyScore | number | likeCount − dislikeCount |
+
+### `stories/{storyId}/views/{userId}`
+
+| Field | Type |
+|-------|------|
+| actorId | string |
+| displayName | string |
+| photoURL | string |
+| viewedAt | timestamp |
+
+### `stories/{storyId}/likes/{userId}`
+
+| Field | Type |
+|-------|------|
+| actorId | string |
+| displayName | string |
+| photoURL | string |
+| likedAt | timestamp |
+
+### `actorStoryEngagements/{actorId}_{storyId}`
+
+| Field | Type |
+|-------|------|
+| actorId | string |
+| storyId | string |
+| liked | boolean |
+| voteNet | number |
+| updatedAt | timestamp |
+
+### `storyVoteBatches/{autoId}`
+
+Audit kaydı (profile/post vote batch ile aynı mantık).
 
 ## Security Notes
 

@@ -109,7 +109,8 @@ async function applyInteraction({ postId, actorId, type, commentText }) {
     type === "comment" ? await resolveUserPublic(actorId) : null;
 
   const postRef = db.collection("posts").doc(postId);
-  const interactionRef = db.collection("interactions").doc();
+  const interactionRef =
+    type === "comment" ? db.collection("interactions").doc() : null;
 
   return db.runTransaction(async (transaction) => {
     const postSnap = await transaction.get(postRef);
@@ -141,16 +142,6 @@ async function applyInteraction({ postId, actorId, type, commentText }) {
         const scoreDelta = REPEAT_POINTS;
         const newPostScore = oldPostScore + REPEAT_POINTS;
         const newAuthorTotalScore = oldAuthorTotalScore + REPEAT_POINTS;
-
-        transaction.set(interactionRef, {
-          type,
-          actorId,
-          postId,
-          authorId,
-          pointsDelta: REPEAT_POINTS,
-          alreadyInteracted: true,
-          createdAt: FieldValue.serverTimestamp(),
-        });
 
         transaction.update(postRef, { postScore: newPostScore });
 
@@ -211,7 +202,7 @@ async function applyInteraction({ postId, actorId, type, commentText }) {
       createdAt: FieldValue.serverTimestamp(),
     };
 
-    if (type === "comment" && commentText?.trim()) {
+    if (type === "comment" && commentText?.trim() && interactionRef) {
       interactionData.commentText = commentText.trim();
       if (actorProfile?.displayName) {
         interactionData.actorDisplayName = actorProfile.displayName;
@@ -219,9 +210,8 @@ async function applyInteraction({ postId, actorId, type, commentText }) {
       if (actorProfile?.photoURL) {
         interactionData.actorPhotoURL = actorProfile.photoURL;
       }
+      transaction.set(interactionRef, interactionData);
     }
-
-    transaction.set(interactionRef, interactionData);
 
     transaction.update(postRef, {
       ...counts,
@@ -246,7 +236,7 @@ async function applyInteraction({ postId, actorId, type, commentText }) {
       engagement,
     });
 
-    if (type === "comment" && commentText?.trim()) {
+    if (type === "comment" && commentText?.trim() && interactionRef) {
       result.comment = {
         id: interactionRef.id,
         actorId,

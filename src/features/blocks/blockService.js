@@ -3,6 +3,8 @@ const { BlockError } = require("./blockErrors");
 const { buildBlockId } = require("./blockId");
 const { getCached, setCached, invalidateCached, getCacheKey } = require("../feed/feedCache");
 
+const MAX_BLOCK_LIST_SIZE = 500;
+
 function invalidateBlockedUserCache(userId) {
   if (!userId) return;
   void invalidateCached(getCacheKey(["blocks", userId]));
@@ -20,8 +22,16 @@ async function getBlockedUserIds(userId) {
   }
 
   const [blockedByMeSnap, blockedMeSnap] = await Promise.all([
-    db.collection("blocks").where("blockerId", "==", userId).get(),
-    db.collection("blocks").where("blockedUserId", "==", userId).get(),
+    db
+      .collection("blocks")
+      .where("blockerId", "==", userId)
+      .limit(MAX_BLOCK_LIST_SIZE)
+      .get(),
+    db
+      .collection("blocks")
+      .where("blockedUserId", "==", userId)
+      .limit(MAX_BLOCK_LIST_SIZE)
+      .get(),
   ]);
 
   const blocked = new Set();

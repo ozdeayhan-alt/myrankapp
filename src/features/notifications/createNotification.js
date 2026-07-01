@@ -15,7 +15,7 @@ const NOTIFICATION_TYPES = new Set([
 ]);
 
 /**
- * In-app notification for "Sen yokken neler oldu?" (client reads via Firestore).
+ * In-app notification for "Sen yokken neler oldu?" (client reads via API).
  */
 async function createNotification({
   recipientId,

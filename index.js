@@ -18,6 +18,11 @@ const MOBILE_PREVIEW_APK_PATH = path.join(
   "myrank-preview.apk",
 );
 const MOBILE_DEV_APK_PATH = path.join(__dirname, "public", "myrank-dev.apk");
+const MOBILE_RELEASE_AAB_PATH = path.join(
+  __dirname,
+  "public",
+  "myrank-release.aab",
+);
 const admin = require("./firebase-config");
 const { db } = require("./src/lib/firestore");
 const {
@@ -39,6 +44,7 @@ const pushRoutes = require("./src/features/push/api/routes");
 const blocksRoutes = require("./src/features/blocks/api/routes");
 const accountRoutes = require("./src/features/account/api/routes");
 const storiesRoutes = require("./src/features/stories/api/routes");
+const notificationsRoutes = require("./src/features/notifications/api/routes");
 const { registerLegalRoutes } = require("./src/legal/routes");
 const {
   apiRateLimit,
@@ -47,6 +53,16 @@ const {
 } = require("./src/lib/rateLimit");
 const { createRequestMetricsMiddleware, getRequestMetrics } = require("./src/lib/requestMetrics");
 const { getCacheStats } = require("./src/features/feed/feedCache");
+
+function isStatusDetailAuthorized(req) {
+  const secret = process.env.STATUS_SECRET?.trim();
+  if (!secret) {
+    return false;
+  }
+
+  const header = req.headers["x-status-secret"]?.toString().trim();
+  return Boolean(header && header === secret);
+}
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -84,6 +100,7 @@ app.get("/", (req, res) => {
     mobileApk: "/download/myrank.apk",
     mobilePreviewApk: "/download/myrank-preview.apk",
     mobileDevApk: "/download/myrank-dev.apk",
+    mobileReleaseAab: "/download/myrank-release.aab",
     privacyPolicy: "/privacy",
     termsOfService: "/terms",
     moderationPolicy: "/moderation",
@@ -117,6 +134,14 @@ app.get("/download/myrank-dev.apk", (req, res) => {
   });
 });
 
+app.get("/download/myrank-release.aab", (req, res) => {
+  res.download(MOBILE_RELEASE_AAB_PATH, "myrank-release.aab", (err) => {
+    if (err && !res.headersSent) {
+      res.status(404).json({ error: "Release AAB bulunamadı" });
+    }
+  });
+});
+
 app.get("/status", async (req, res) => {
   try {
     const firebaseApp = admin.app();
@@ -138,6 +163,13 @@ app.get("/status", async (req, res) => {
       firestore.status === "ok" &&
       storage.status === "ok" &&
       mediaProxy.status === "ok";
+
+    if (!isStatusDetailAuthorized(req)) {
+      return res.json({
+        status: allOk ? "ok" : "degraded",
+        timestamp: new Date().toISOString(),
+      });
+    }
 
     res.json({
       status: allOk ? "ok" : "degraded",
@@ -178,6 +210,7 @@ app.use("/api", pushRoutes);
 app.use("/api", blocksRoutes);
 app.use("/api", accountRoutes);
 app.use("/api", storiesRoutes);
+app.use("/api", notificationsRoutes);
 
 app.listen(PORT, () => {
   console.log(`Sunucu http://localhost:${PORT} adresinde çalışıyor`);

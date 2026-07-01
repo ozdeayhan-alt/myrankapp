@@ -1,4 +1,5 @@
 const { FieldValue } = require("firebase-admin/firestore");
+const crypto = require("crypto");
 const { admin, db } = require("../../lib/firestore");
 const {
   normalizeDisplayNameForSearch,
@@ -47,16 +48,33 @@ async function syncPublicProfile(userId, data) {
   await db.collection("publicProfiles").doc(userId).set(payload, { merge: true });
 }
 
+function isBotClientAuthDisabled() {
+  if (process.env.MYRANK_ENABLE_BOT_CLIENT_AUTH === "1") {
+    return false;
+  }
+  return process.env.NODE_ENV === "production";
+}
+
+function generateBotPassword() {
+  return crypto.randomBytes(32).toString("base64url");
+}
+
 async function ensureAuthUser(persona) {
   const email = `${persona.uid}@bots.myrank.local`;
+  const disableClientLogin = isBotClientAuthDisabled();
+
   try {
     await admin.auth().getUser(persona.uid);
-    await admin.auth().updateUser(persona.uid, {
+    const updatePayload = {
       displayName: persona.displayName,
       email,
       emailVerified: true,
-      disabled: false,
-    });
+      disabled: disableClientLogin,
+    };
+    if (disableClientLogin) {
+      updatePayload.password = generateBotPassword();
+    }
+    await admin.auth().updateUser(persona.uid, updatePayload);
     return { created: false };
   } catch (error) {
     if (error.code !== "auth/user-not-found") {
@@ -69,8 +87,8 @@ async function ensureAuthUser(persona) {
     email,
     emailVerified: true,
     displayName: persona.displayName,
-    password: `MyRankBot!${persona.uid}`,
-    disabled: false,
+    password: generateBotPassword(),
+    disabled: disableClientLogin,
   });
 
   return { created: true };

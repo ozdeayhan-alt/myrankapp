@@ -1,6 +1,7 @@
 const { FieldValue } = require("firebase-admin/firestore");
 const { db } = require("../../../lib/firestore");
 const { syncPublicProfileInTransaction } = require("../../profile/syncPublicProfile");
+const { assertNotSelfVote } = require("../voteErrors");
 
 const MAX_PROFILE_VOTE_DELTA = 200;
 
@@ -37,6 +38,8 @@ async function applyProfileVoteBatch({ actorId, targetUserId, delta: rawDelta })
   if (Math.abs(delta) > MAX_PROFILE_VOTE_DELTA) {
     throw new Error(`delta cannot exceed ${MAX_PROFILE_VOTE_DELTA}`);
   }
+
+  assertNotSelfVote(actorId, targetUserId);
 
   const userRef = db.collection("users").doc(targetUserId);
   const batchRef = db.collection("profileVoteBatches").doc();

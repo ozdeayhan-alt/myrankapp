@@ -12,6 +12,18 @@ function isRedisEnabled() {
   return process.env.REDIS_ENABLED !== "false";
 }
 
+/** Prod'da (veya REDIS_REQUIRED=true) kuyruk/cache için Redis zorunlu. */
+function isRedisRequired() {
+  const explicit = process.env.REDIS_REQUIRED?.trim().toLowerCase();
+  if (explicit === "false") {
+    return false;
+  }
+  if (explicit === "true") {
+    return true;
+  }
+  return process.env.NODE_ENV === "production";
+}
+
 async function getRedisClient() {
   if (!isRedisEnabled()) {
     return null;
@@ -37,7 +49,9 @@ async function getRedisClient() {
       } catch (error) {
         redisStatus = "unavailable";
         console.warn(
-          "[redis] unavailable, using in-memory cache:",
+          isRedisRequired()
+            ? "[redis] REQUIRED but unavailable:"
+            : "[redis] unavailable, dev in-memory fallback:",
           error.message ?? error
         );
         return null;
@@ -63,5 +77,6 @@ module.exports = {
   getRedisClient,
   getRedisStatus,
   isRedisEnabled,
+  isRedisRequired,
   closeRedis,
 };

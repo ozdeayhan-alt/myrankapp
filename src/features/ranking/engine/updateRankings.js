@@ -8,8 +8,7 @@ const DEFAULT_DISPLAY_NAME = "İsimsiz Kullanıcı";
  * Denormalize author into rankings/{segmentKey}/entries/{userId} for each segment variant.
  */
 function upsertAuthorRankings(transaction, { userId, userData, totalScore }) {
-  const metadata = userData?.metadata;
-  if (!metadata) return;
+  const metadata = userData?.metadata ?? null;
 
   const displayName =
     typeof userData.displayName === "string" && userData.displayName.trim()
@@ -49,8 +48,7 @@ function upsertAuthorRankings(transaction, { userId, userData, totalScore }) {
  * Fire-and-forget ranking denorm (outside hot tap transaction).
  */
 async function upsertAuthorRankingsAsync({ userId, userData, totalScore }) {
-  const metadata = userData?.metadata;
-  if (!metadata) return;
+  const metadata = userData?.metadata ?? null;
 
   const displayName =
     typeof userData.displayName === "string" && userData.displayName.trim()

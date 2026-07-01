@@ -13,14 +13,14 @@ function parseEnvMs(name, fallbackMs) {
 }
 
 /** Varsayılan feed sayfası cache süresi (ms). */
-const CACHE_TTL_MS = parseEnvMs("FEED_CACHE_TTL_MS", 180_000);
+const CACHE_TTL_MS = parseEnvMs("FEED_CACHE_TTL_MS", 240_000);
 
-const FEED_RECENT_TTL_MS = parseEnvMs("FEED_RECENT_TTL_MS", CACHE_TTL_MS);
-const FEED_EXPLORE_TTL_MS = parseEnvMs("FEED_EXPLORE_TTL_MS", 300_000);
-const FEED_FOLLOWING_TTL_MS = parseEnvMs("FEED_FOLLOWING_TTL_MS", 180_000);
-const FEED_AUTHOR_TTL_MS = parseEnvMs("FEED_AUTHOR_TTL_MS", CACHE_TTL_MS);
-const FEED_HASHTAG_TTL_MS = parseEnvMs("FEED_HASHTAG_TTL_MS", CACHE_TTL_MS);
-const FEED_SAVED_TTL_MS = parseEnvMs("FEED_SAVED_TTL_MS", 120_000);
+const FEED_RECENT_TTL_MS = parseEnvMs("FEED_RECENT_TTL_MS", 360_000);
+const FEED_EXPLORE_TTL_MS = parseEnvMs("FEED_EXPLORE_TTL_MS", 600_000);
+const FEED_FOLLOWING_TTL_MS = parseEnvMs("FEED_FOLLOWING_TTL_MS", 480_000);
+const FEED_AUTHOR_TTL_MS = parseEnvMs("FEED_AUTHOR_TTL_MS", 360_000);
+const FEED_HASHTAG_TTL_MS = parseEnvMs("FEED_HASHTAG_TTL_MS", 360_000);
+const FEED_SAVED_TTL_MS = parseEnvMs("FEED_SAVED_TTL_MS", 240_000);
 
 const FOLLOWING_AUTHORS_TTL_MS = parseEnvMs(
   "FEED_FOLLOWING_AUTHORS_TTL_MS",
@@ -212,6 +212,22 @@ async function invalidateFeedCaches() {
   );
 }
 
+/** Yalnızca belirli kullanıcının feed cache girdilerini temizler. */
+async function invalidateFeedCachesForUser(userId) {
+  if (!userId) {
+    return;
+  }
+  const needle = `:${userId}:`;
+  await invalidateMatchingFeedCache(
+    (key) =>
+      (key === "feed" || key.startsWith("feed:")) && key.includes(needle)
+  );
+  await invalidateMatchingFeedCache((key) =>
+    key.startsWith(`profile:summary:${userId}:`) ||
+    key.startsWith(`profile:gauge-bootstrap:${userId}:`)
+  );
+}
+
 async function invalidateFeedCachesForPost({
   authorId,
   segmentKey,
@@ -298,6 +314,7 @@ module.exports = {
   setCached,
   invalidateCached,
   invalidateFeedCaches,
+  invalidateFeedCachesForUser,
   invalidateFeedCachesForPost,
   invalidateMatchingFeedCache,
   invalidateFollowingAuthors,

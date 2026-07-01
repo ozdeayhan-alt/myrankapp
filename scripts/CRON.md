@@ -1,6 +1,14 @@
 # Gece sıralama (ranking rebuild)
 
-Profil TP ve gönderi etkileşimleri gün içinde `users.totalScore` günceller; **sıralama listeleri** (`rankings/.../entries`) yalnızca bu job ile yenilenir.
+Profil TP gün içinde `users.totalScore` ve `rankings/.../entries.totalScore` ile senkronize edilir; **sıra numarası** (`rank`, momentum) gece job ile yenilenir.
+
+**Varsayılan:** incremental rebuild (mevcut entry'lerden rank hesabı).
+
+**Tam rebuild** (haftada bir önerilir — tüm kullanıcıları segmentlere ekler):
+
+```bash
+RANKING_FULL_REBUILD=true npm run rebuild-rankings
+```
 
 ## Otomatik kurulum (önerilen)
 

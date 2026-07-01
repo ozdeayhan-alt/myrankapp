@@ -14,6 +14,8 @@ logs/
 
 # Release binaries
 public/myrank-release.aab
+public/myrank.apk
+public/*.apk
 
 # OS files
 .DS_Store

@@ -52,6 +52,101 @@ async function resolveBehindFields(coll, rank, segmentTotal) {
   return { behindRank: rank + 1, behindTotalScore };
 }
 
+async function ensureRankingSegmentEntry(
+  segmentKey,
+  userId,
+  totalScore,
+  displayName,
+  metadata
+) {
+  const coll = db.collection("rankings").doc(segmentKey).collection("entries");
+  const entryRef = coll.doc(userId);
+  const entrySnap = await entryRef.get();
+
+  if (entrySnap.exists) {
+    const existing = entrySnap.data();
+    let rank = typeof existing.rank === "number" ? existing.rank : null;
+    let segmentTotal =
+      typeof existing.segmentTotal === "number" ? existing.segmentTotal : null;
+
+    if (rank === null || segmentTotal === null) {
+      const [totalSnap, higherSnap] = await Promise.all([
+        coll.count().get(),
+        coll.where("totalScore", ">", totalScore).count().get(),
+      ]);
+      segmentTotal = totalSnap.data().count;
+      rank = higherSnap.data().count + 1;
+    }
+
+    const existingAheadRank =
+      typeof existing.aheadRank === "number" ? existing.aheadRank : null;
+    const existingAheadTotalScore =
+      typeof existing.aheadTotalScore === "number"
+        ? existing.aheadTotalScore
+        : null;
+    const existingBehindRank =
+      typeof existing.behindRank === "number" ? existing.behindRank : null;
+    const existingBehindTotalScore =
+      typeof existing.behindTotalScore === "number"
+        ? existing.behindTotalScore
+        : null;
+
+    // totalScore yalnızca gece rebuild ile güncellenir; canlı TP yazılmaz.
+    await entryRef.set(
+      {
+        userId,
+        displayName,
+        metadata,
+        rank,
+        segmentTotal,
+        aheadRank: existingAheadRank,
+        aheadTotalScore: existingAheadTotalScore,
+        behindRank: existingBehindRank,
+        behindTotalScore: existingBehindTotalScore,
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    return {
+      segmentKey,
+      rank,
+      segmentTotal,
+      created: false,
+    };
+  }
+
+  const countSnap = await coll.count().get();
+  const existingCount = countSnap.data().count;
+  const segmentTotal = existingCount + 1;
+  const rank = segmentTotal;
+  const [ahead, behind] = await Promise.all([
+    resolveAheadFields(coll, rank),
+    resolveBehindFields(coll, rank, segmentTotal),
+  ]);
+
+  await entryRef.set({
+    userId,
+    totalScore,
+    displayName,
+    metadata,
+    rank,
+    segmentTotal,
+    aheadRank: ahead.aheadRank,
+    aheadTotalScore: ahead.aheadTotalScore,
+    behindRank: behind.behindRank,
+    behindTotalScore: behind.behindTotalScore,
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+
+  return {
+    segmentKey,
+    rank,
+    segmentTotal,
+    created: true,
+  };
+}
+
 /**
  * Kayıt / profil tamamlama sonrası kullanıcıyı ilgili segment sıralama listelerine ekler.
  * Yeni kullanıcı listenin sonuna (en düşük TP) yerleştirilir.
@@ -88,97 +183,17 @@ async function ensureUserRankingEntries(userId) {
       : DEFAULT_DISPLAY_NAME;
 
   const segmentKeys = getRankingSegmentKeys(metadata);
-  const segments = [];
-
-  for (const segmentKey of segmentKeys) {
-    const coll = db.collection("rankings").doc(segmentKey).collection("entries");
-    const entryRef = coll.doc(userId);
-    const entrySnap = await entryRef.get();
-
-    if (entrySnap.exists) {
-      const existing = entrySnap.data();
-      let rank =
-        typeof existing.rank === "number" ? existing.rank : null;
-      let segmentTotal =
-        typeof existing.segmentTotal === "number" ? existing.segmentTotal : null;
-
-      if (rank === null || segmentTotal === null) {
-        const totalSnap = await coll.count().get();
-        segmentTotal = totalSnap.data().count;
-        const higherSnap = await coll
-          .where("totalScore", ">", totalScore)
-          .count()
-          .get();
-        rank = higherSnap.data().count + 1;
-      }
-
-      const existingAheadRank =
-        typeof existing.aheadRank === "number" ? existing.aheadRank : null;
-      const existingAheadTotalScore =
-        typeof existing.aheadTotalScore === "number"
-          ? existing.aheadTotalScore
-          : null;
-      const existingBehindRank =
-        typeof existing.behindRank === "number" ? existing.behindRank : null;
-      const existingBehindTotalScore =
-        typeof existing.behindTotalScore === "number"
-          ? existing.behindTotalScore
-          : null;
-
-      // totalScore yalnızca gece rebuild ile güncellenir; canlı TP yazılmaz.
-      await entryRef.set(
-        {
-          userId,
-          displayName,
-          metadata,
-          rank,
-          segmentTotal,
-          aheadRank: existingAheadRank,
-          aheadTotalScore: existingAheadTotalScore,
-          behindRank: existingBehindRank,
-          behindTotalScore: existingBehindTotalScore,
-          updatedAt: FieldValue.serverTimestamp(),
-        },
-        { merge: true }
-      );
-
-      segments.push({
+  const segments = await Promise.all(
+    segmentKeys.map((segmentKey) =>
+      ensureRankingSegmentEntry(
         segmentKey,
-        rank,
-        segmentTotal,
-        created: false,
-      });
-      continue;
-    }
-
-    const countSnap = await coll.count().get();
-    const existingCount = countSnap.data().count;
-    const segmentTotal = existingCount + 1;
-    const rank = segmentTotal;
-    const ahead = await resolveAheadFields(coll, rank);
-    const behind = await resolveBehindFields(coll, rank, segmentTotal);
-
-    await entryRef.set({
-      userId,
-      totalScore,
-      displayName,
-      metadata,
-      rank,
-      segmentTotal,
-      aheadRank: ahead.aheadRank,
-      aheadTotalScore: ahead.aheadTotalScore,
-      behindRank: behind.behindRank,
-      behindTotalScore: behind.behindTotalScore,
-      updatedAt: FieldValue.serverTimestamp(),
-    });
-
-    segments.push({
-      segmentKey,
-      rank,
-      segmentTotal,
-      created: true,
-    });
-  }
+        userId,
+        totalScore,
+        displayName,
+        metadata
+      )
+    )
+  );
 
   return { ensured: true, segments };
 }

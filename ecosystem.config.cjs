@@ -1,3 +1,5 @@
+require("dotenv").config({ path: require("path").join(__dirname, ".env") });
+
 module.exports = {
   apps: [
     {
@@ -20,6 +22,7 @@ module.exports = {
         REDIS_URL: "redis://127.0.0.1:6379",
         FOLLOWING_FEED_USER_FEEDS_ONLY: "true",
         MEDIA_PROXY_ORIGIN: "https://myrank.com.tr",
+        STATUS_SECRET: process.env.STATUS_SECRET || "",
       },
     },
     {
@@ -38,6 +41,7 @@ module.exports = {
         GRPC_DNS_RESOLVER: "ares",
         FIREBASE_STORAGE_BUCKET: "myrankapp-d62b9.firebasestorage.app",
         REDIS_URL: "redis://127.0.0.1:6379",
+        STATUS_SECRET: process.env.STATUS_SECRET || "",
       },
     },
     {
