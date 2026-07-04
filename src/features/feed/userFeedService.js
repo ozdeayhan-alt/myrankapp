@@ -1,4 +1,5 @@
 const { db } = require("../../lib/firestore");
+const { resolveFeedContentType } = require("./feedContentType");
 
 const MAX_FANOUT_FOLLOWERS = 500;
 const BACKFILL_POST_LIMIT = 30;
@@ -36,7 +37,12 @@ async function commitBatchWrites(writes) {
   }
 }
 
-async function fanOutPostToFollowers({ postId, authorId, createdAtMillis }) {
+async function fanOutPostToFollowers({
+  postId,
+  authorId,
+  createdAtMillis,
+  feedContentType,
+}) {
   if (!postId || !authorId) {
     return { fanOutCount: 0 };
   }
@@ -47,10 +53,15 @@ async function fanOutPostToFollowers({ postId, authorId, createdAtMillis }) {
   }
 
   const millis = typeof createdAtMillis === "number" ? createdAtMillis : Date.now();
+  const resolvedFeedContentType =
+    feedContentType && typeof feedContentType === "string"
+      ? feedContentType
+      : "tweet";
   const payload = {
     postId,
     authorId,
     createdAtMillis: millis,
+    feedContentType: resolvedFeedContentType,
   };
 
   const writes = followerIds.map((followerId) => ({
@@ -73,6 +84,7 @@ async function fanOutPostById(postId) {
     postId,
     authorId: data.authorId,
     createdAtMillis: data.createdAt?.toMillis?.() ?? Date.now(),
+    feedContentType: resolveFeedContentType(data),
   });
 }
 

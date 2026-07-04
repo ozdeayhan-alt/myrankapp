@@ -15,6 +15,7 @@ const {
   FEED_SAVED_TTL_MS,
 } = require("../feedCache");
 const { attachEngagementsToFeedPage } = require("../feedEngagement");
+const { parseFeedContentTypeQuery } = require("../feedContentType");
 const { fetchSavedPostsPage } = require("../fetchSavedPosts");
 const {
   fetchRecentFeedPage,
@@ -25,6 +26,12 @@ const {
 } = require("../fetchFeedPosts");
 
 const router = express.Router();
+
+function readFeedContentType(req) {
+  const raw =
+    typeof req.query.contentType === "string" ? req.query.contentType : undefined;
+  return parseFeedContentTypeQuery(raw);
+}
 
 async function buildFeedResponse(viewerId, page, cacheKey, ttlMs) {
   const filtered = await filterPostsForViewer(viewerId, page);
@@ -57,8 +64,14 @@ router.post(
   verifyAuth,
   feedInvalidateRateLimit,
   async (req, res) => {
-    await invalidateFeedCachesForUser(req.user.uid);
-    res.json({ ok: true });
+    try {
+      await invalidateFeedCachesForUser(req.user.uid);
+      res.json({ ok: true });
+    } catch (error) {
+      res.status(500).json({
+        error: error.message ?? "Feed invalidate failed",
+      });
+    }
   }
 );
 
@@ -101,10 +114,12 @@ router.get("/feed/recent", verifyAuth, async (req, res) => {
       typeof req.query.cursor === "string" ? req.query.cursor : undefined;
     const limit =
       typeof req.query.limit === "string" ? req.query.limit : undefined;
+    const feedContentType = readFeedContentType(req);
     const cacheKey = getCacheKey([
       "feed",
       "recent",
       req.user.uid,
+      feedContentType,
       cursor ?? "",
       limit ?? "",
     ]);
@@ -114,7 +129,7 @@ router.get("/feed/recent", verifyAuth, async (req, res) => {
       req.user.uid,
       cacheKey,
       FEED_RECENT_TTL_MS,
-      () => fetchRecentFeedPage({ cursor, limit })
+      () => fetchRecentFeedPage({ cursor, limit, feedContentType })
     );
   } catch (error) {
     res.status(500).json({
@@ -129,10 +144,12 @@ router.get("/feed/following", verifyAuth, async (req, res) => {
       typeof req.query.cursor === "string" ? req.query.cursor : undefined;
     const limit =
       typeof req.query.limit === "string" ? req.query.limit : undefined;
+    const feedContentType = readFeedContentType(req);
     const cacheKey = getCacheKey([
       "feed",
       "following",
       req.user.uid,
+      feedContentType,
       cursor ?? "",
       limit ?? "",
     ]);
@@ -147,6 +164,7 @@ router.get("/feed/following", verifyAuth, async (req, res) => {
           userId: req.user.uid,
           cursor,
           limit,
+          feedContentType,
         })
     );
   } catch (error) {
@@ -163,11 +181,13 @@ router.get("/feed/author/:authorId", verifyAuth, async (req, res) => {
       typeof req.query.cursor === "string" ? req.query.cursor : undefined;
     const limit =
       typeof req.query.limit === "string" ? req.query.limit : undefined;
+    const feedContentType = readFeedContentType(req);
     const cacheKey = getCacheKey([
       "feed",
       "author",
       req.user.uid,
       authorId,
+      feedContentType,
       cursor ?? "",
       limit ?? "",
     ]);
@@ -177,7 +197,7 @@ router.get("/feed/author/:authorId", verifyAuth, async (req, res) => {
       req.user.uid,
       cacheKey,
       FEED_AUTHOR_TTL_MS,
-      () => fetchAuthorFeedPage({ authorId, cursor, limit })
+      () => fetchAuthorFeedPage({ authorId, cursor, limit, feedContentType })
     );
   } catch (error) {
     res.status(500).json({
@@ -226,6 +246,7 @@ router.get("/feed/explore", verifyAuth, async (req, res) => {
       typeof req.query.cursor === "string" ? req.query.cursor : undefined;
     const limit =
       typeof req.query.limit === "string" ? req.query.limit : undefined;
+    const feedContentType = readFeedContentType(req);
     const filters = {
       country:
         typeof req.query.country === "string" ? req.query.country : undefined,
@@ -251,6 +272,7 @@ router.get("/feed/explore", verifyAuth, async (req, res) => {
       req.user.uid,
       segmentKey ?? "",
       JSON.stringify(filters),
+      feedContentType,
       cursor ?? "",
       limit ?? "",
     ]);
@@ -266,6 +288,7 @@ router.get("/feed/explore", verifyAuth, async (req, res) => {
           filters,
           cursor,
           limit,
+          feedContentType,
         })
     );
   } catch (error) {

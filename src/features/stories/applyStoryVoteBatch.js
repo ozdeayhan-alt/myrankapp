@@ -11,7 +11,6 @@ const {
   loadAccessibleStory,
 } = require("./storyAccess");
 const { StoryError } = require("./storyErrors");
-const { assertNotSelfVote } = require("../ranking/voteErrors");
 
 const MAX_STORY_VOTE_DELTA = MAX_PROFILE_VOTE_DELTA;
 
@@ -86,7 +85,6 @@ async function applyStoryVoteBatch({ actorId, storyId, delta: rawDelta }) {
     storyId
   );
   const authorId = storyData.userId;
-  assertNotSelfVote(actorId, authorId);
 
   const batchRef = db.collection("storyVoteBatches").doc();
   const userRef = db.collection("users").doc(authorId);

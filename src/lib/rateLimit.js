@@ -1,7 +1,12 @@
 /**
- * Lightweight in-memory rate limiter (per key / window).
- * Suitable for single-instance PM2; resets on process restart.
+ * Rate limiter with Redis backing (shared across PM2 instances).
+ * Falls back to in-memory when Redis is unavailable.
  */
+
+const { getRedisClient } = require("./redis");
+
+const RATE_LIMIT_PREFIX =
+  process.env.RATE_LIMIT_REDIS_PREFIX?.trim() || "myrank:rl:";
 
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
@@ -25,7 +30,22 @@ function shouldSkipWriteLimit(req) {
   return WRITE_LIMIT_SKIP_PATHS.has(normalizePath(req.path));
 }
 
-function createRateLimiter({ windowMs, max, message, methods, skip }) {
+/** Self-vote (core product loop) — no per-minute cap on profile TP votes to own uid. */
+function shouldSkipVoteRateLimit(req) {
+  const uid = req.user?.uid;
+  if (!uid) {
+    return false;
+  }
+
+  const path = normalizePath(req.path);
+  if (path === "/profile-votes/batch" && req.body?.targetUserId === uid) {
+    return true;
+  }
+
+  return false;
+}
+
+function createMemoryRateLimiter({ windowMs, max, message, methods, skip }) {
   const hits = new Map();
 
   function prune(now) {
@@ -80,6 +100,64 @@ function createRateLimiter({ windowMs, max, message, methods, skip }) {
   };
 }
 
+function createRateLimiter(options) {
+  const memoryLimiter = createMemoryRateLimiter(options);
+  const { windowMs, max, message, methods, skip } = options;
+
+  return async function rateLimitMiddleware(req, res, next) {
+    if (methods && !methods.has(req.method)) {
+      return next();
+    }
+
+    if (skip?.(req)) {
+      return next();
+    }
+
+    const userId = req.user?.uid;
+    const ip =
+      req.headers["x-forwarded-for"]?.toString().split(",")[0]?.trim() ||
+      req.socket?.remoteAddress ||
+      "unknown";
+    const key = userId ? `user:${userId}` : `ip:${ip}`;
+
+    const redis = await getRedisClient();
+    if (!redis) {
+      return memoryLimiter(req, res, next);
+    }
+
+    try {
+      const redisKey = `${RATE_LIMIT_PREFIX}${key}`;
+      const count = await redis.incr(redisKey);
+      if (count === 1) {
+        await redis.pExpire(redisKey, windowMs);
+      }
+
+      res.setHeader("X-RateLimit-Limit", String(max));
+      res.setHeader(
+        "X-RateLimit-Remaining",
+        String(Math.max(0, max - count))
+      );
+
+      if (count > max) {
+        const ttl = await redis.pTTL(redisKey);
+        return res.status(429).json({
+          error: message ?? "Too many requests",
+          retryAfterMs: ttl > 0 ? ttl : windowMs,
+        });
+      }
+
+      return next();
+    } catch (error) {
+      console.warn("[rateLimit] redis failed, using memory:", error.message ?? error);
+      try {
+        return memoryLimiter(req, res, next);
+      } catch (memoryError) {
+        return next(memoryError);
+      }
+    }
+  };
+}
+
 const apiRateLimit = createRateLimiter({
   windowMs: 60_000,
   max: Number(process.env.API_RATE_LIMIT_PER_MINUTE) || 180,
@@ -103,8 +181,9 @@ const uploadRateLimit = createRateLimiter({
 /** Vote batch routes — apply after verifyAuth so req.user.uid is set. */
 const voteRateLimit = createRateLimiter({
   windowMs: 60_000,
-  max: Number(process.env.API_VOTE_RATE_LIMIT_PER_MINUTE) || 20,
+  max: Number(process.env.API_VOTE_RATE_LIMIT_PER_MINUTE) || 1200,
   message: "Çok fazla oy isteği. Lütfen kısa süre sonra tekrar deneyin.",
+  skip: shouldSkipVoteRateLimit,
 });
 
 /** POST /feed/invalidate — pull-to-refresh cache bust spam koruması. */
@@ -117,8 +196,10 @@ const feedInvalidateRateLimit = createRateLimiter({
 
 module.exports = {
   createRateLimiter,
+  createMemoryRateLimiter,
   normalizePath,
   shouldSkipWriteLimit,
+  shouldSkipVoteRateLimit,
   MUTATING_METHODS,
   WRITE_LIMIT_SKIP_PATHS,
   apiRateLimit,

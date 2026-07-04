@@ -6,12 +6,6 @@ class VoteError extends Error {
   }
 }
 
-function assertNotSelfVote(actorId, targetId) {
-  if (actorId && targetId && actorId === targetId) {
-    throw new VoteError(403, "Kendi içeriğinize oy veremezsiniz");
-  }
-}
-
 function mapVoteError(error, res, fallbackMessage) {
   if (error instanceof VoteError) {
     return res.status(error.status).json({ error: error.message });
@@ -23,4 +17,4 @@ function mapVoteError(error, res, fallbackMessage) {
   });
 }
 
-module.exports = { VoteError, assertNotSelfVote, mapVoteError };
+module.exports = { VoteError, mapVoteError };

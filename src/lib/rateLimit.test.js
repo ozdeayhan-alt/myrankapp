@@ -1,8 +1,9 @@
 const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
 const {
-  createRateLimiter,
+  createMemoryRateLimiter,
   shouldSkipWriteLimit,
+  shouldSkipVoteRateLimit,
   normalizePath,
 } = require("./rateLimit");
 
@@ -29,8 +30,35 @@ describe("rateLimit", () => {
     );
   });
 
+  it("shouldSkipVoteRateLimit skips profile self-vote", () => {
+    assert.equal(
+      shouldSkipVoteRateLimit({
+        path: "/profile-votes/batch",
+        user: { uid: "user_a" },
+        body: { targetUserId: "user_a", delta: 1 },
+      }),
+      true
+    );
+    assert.equal(
+      shouldSkipVoteRateLimit({
+        path: "/profile-votes/batch",
+        user: { uid: "user_a" },
+        body: { targetUserId: "user_b", delta: 1 },
+      }),
+      false
+    );
+    assert.equal(
+      shouldSkipVoteRateLimit({
+        path: "/post-votes/batch",
+        user: { uid: "user_a" },
+        body: { postId: "p1", delta: 1 },
+      }),
+      false
+    );
+  });
+
   it("write limiter ignores GET requests", () => {
-    const limiter = createRateLimiter({
+    const limiter = createMemoryRateLimiter({
       windowMs: 60_000,
       max: 1,
       methods: new Set(["POST"]),
@@ -67,7 +95,7 @@ describe("rateLimit", () => {
   });
 
   it("write limiter enforces max for POST requests", () => {
-    const limiter = createRateLimiter({
+    const limiter = createMemoryRateLimiter({
       windowMs: 60_000,
       max: 1,
       methods: new Set(["POST"]),

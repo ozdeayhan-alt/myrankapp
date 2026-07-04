@@ -1,10 +1,5 @@
 const { getRedisClient, isRedisRequired } = require("./redis");
 const { fanOutPostById, fanOutPostToFollowers } = require("../features/feed/userFeedService");
-const { processVideoUploadWithFallback } = require("../features/uploads/processVideo");
-const {
-  markVideoJobComplete,
-  markVideoJobFailed,
-} = require("../features/uploads/videoJobStore");
 
 const QUEUE_KEY = process.env.JOB_QUEUE_KEY?.trim() || "myrank:jobs";
 
@@ -23,30 +18,9 @@ async function processJob(job) {
         postId: job.postId,
         authorId: job.authorId,
         createdAtMillis: job.createdAtMillis,
+        feedContentType: job.feedContentType,
       });
       return { type: job.type, postId: job.postId, ...result };
-    }
-    case "processVideo": {
-      try {
-        const result = await processVideoUploadWithFallback(job.storagePath);
-        if (job.jobId) {
-          await markVideoJobComplete(job.jobId, result);
-        }
-        return {
-          type: job.type,
-          jobId: job.jobId,
-          storagePath: job.storagePath,
-          ...result,
-        };
-      } catch (error) {
-        if (job.jobId) {
-          await markVideoJobFailed(
-            job.jobId,
-            error?.message ?? "Video processing failed"
-          );
-        }
-        throw error;
-      }
     }
     default:
       throw new Error(`Unknown job type: ${job.type}`);
@@ -73,21 +47,18 @@ async function enqueueFanOut(postId) {
   return enqueueJob({ type: "fanOut", postId });
 }
 
-async function enqueueFanOutDirect({ postId, authorId, createdAtMillis }) {
+async function enqueueFanOutDirect({
+  postId,
+  authorId,
+  createdAtMillis,
+  feedContentType,
+}) {
   return enqueueJob({
     type: "fanOutDirect",
     postId,
     authorId,
     createdAtMillis,
-  });
-}
-
-async function enqueueProcessVideo({ jobId, storagePath, userId }) {
-  return enqueueJob({
-    type: "processVideo",
-    jobId,
-    storagePath,
-    userId,
+    feedContentType,
   });
 }
 
@@ -110,7 +81,6 @@ module.exports = {
   enqueueJob,
   enqueueFanOut,
   enqueueFanOutDirect,
-  enqueueProcessVideo,
   dequeueJob,
   processJob,
 };

@@ -3,11 +3,12 @@ const { db } = require("../../../lib/firestore");
 const { calculatePostScore } = require("./calculatePostScore");
 const { syncPublicProfileInTransaction } = require("../../profile/syncPublicProfile");
 const {
+  invalidateEngagementCachesForUser,
+} = require("./applyInteraction");
+const {
   parseDelta,
   MAX_PROFILE_VOTE_DELTA,
 } = require("./applyProfileVoteBatch");
-const { assertNotSelfVote } = require("../voteErrors");
-
 const MAX_POST_VOTE_DELTA = MAX_PROFILE_VOTE_DELTA;
 
 function actorDocId(actorId, postId) {
@@ -98,7 +99,6 @@ async function applyPostVoteBatch({ actorId, postId, delta: rawDelta }) {
 
     const post = postSnap.data();
     const authorId = post.authorId;
-    assertNotSelfVote(actorId, authorId);
 
     const userRef = db.collection("users").doc(authorId);
     const userSnap = await transaction.get(userRef);
@@ -169,6 +169,9 @@ async function applyPostVoteBatch({ actorId, postId, delta: rawDelta }) {
       counts,
       engagement: buildEngagementFromEng(eng, voteNet),
     };
+  }).then(async (result) => {
+    await invalidateEngagementCachesForUser(actorId);
+    return result;
   });
 }
 

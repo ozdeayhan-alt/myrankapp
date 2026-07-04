@@ -223,6 +223,9 @@ async function invalidateFeedCachesForUser(userId) {
       (key === "feed" || key.startsWith("feed:")) && key.includes(needle)
   );
   await invalidateMatchingFeedCache((key) =>
+    key.startsWith(`engagements:${userId}:`)
+  );
+  await invalidateMatchingFeedCache((key) =>
     key.startsWith(`profile:summary:${userId}:`) ||
     key.startsWith(`profile:gauge-bootstrap:${userId}:`)
   );

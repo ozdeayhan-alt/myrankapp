@@ -12,10 +12,6 @@ const {
   isAllowedContentType,
   validateContentLength,
 } = require("../uploadPathUtils");
-const { processVideoUploadWithFallback } = require("../processVideo");
-const { createVideoJob, readVideoJob } = require("../videoJobStore");
-const { enqueueProcessVideo } = require("../../../lib/jobQueue");
-const { getRedisClient, isRedisRequired } = require("../../../lib/redis");
 
 const router = express.Router();
 
@@ -118,123 +114,6 @@ router.post("/uploads/finalize", verifyAuth, uploadRateLimit, async (req, res) =
     });
   }
 });
-
-router.post(
-  "/uploads/process-video",
-  verifyAuth,
-  uploadRateLimit,
-  async (req, res) => {
-    try {
-      const { storagePath } = req.body;
-
-      if (!storagePath || typeof storagePath !== "string") {
-        return res.status(400).json({ error: "storagePath is required" });
-      }
-
-      const normalizedPath = normalizeStoragePath(storagePath);
-
-      if (!isAllowedStoragePath(normalizedPath, req.user.uid)) {
-        return res.status(403).json({
-          error:
-            "storagePath must be under posts/{uid}/, profiles/{uid}/, messages/{uid}/ or stories/{uid}/",
-        });
-      }
-
-      if (!normalizedPath.endsWith(".mp4")) {
-        return res.status(400).json({ error: "Only .mp4 videos can be processed" });
-      }
-
-      const redis = await getRedisClient();
-      if (!redis) {
-        if (isRedisRequired()) {
-          return res.status(503).json({
-            error:
-              "Video işleme geçici olarak kullanılamıyor. Lütfen biraz sonra tekrar deneyin.",
-          });
-        }
-
-        const result = await processVideoUploadWithFallback(normalizedPath);
-        return res.json({
-          ok: true,
-          skipped: Boolean(result.skipped),
-          reason: result.reason,
-          hlsURL: result.hlsURL,
-          mediaURL: result.mediaURL,
-          posterURL: result.posterURL,
-          hlsPrefix: result.hlsPrefix,
-        });
-      }
-
-      const job = await createVideoJob({
-        userId: req.user.uid,
-        storagePath: normalizedPath,
-      });
-
-      await enqueueProcessVideo({
-        jobId: job.jobId,
-        storagePath: normalizedPath,
-        userId: req.user.uid,
-      });
-
-      return res.status(202).json({
-        ok: true,
-        jobId: job.jobId,
-        status: "pending",
-      });
-    } catch (error) {
-      console.error("[uploads/process-video]", error);
-      res.status(500).json({
-        error: error.message ?? "Video processing failed",
-      });
-    }
-  }
-);
-
-router.get(
-  "/uploads/process-video/:jobId",
-  verifyAuth,
-  uploadRateLimit,
-  async (req, res) => {
-    try {
-      const job = await readVideoJob(req.params.jobId);
-      if (!job || job.userId !== req.user.uid) {
-        return res.status(404).json({ error: "Job not found" });
-      }
-
-      if (job.status === "complete" && job.result) {
-        return res.json({
-          ok: true,
-          status: "complete",
-          skipped: Boolean(job.result.skipped),
-          reason: job.result.reason,
-          hlsURL: job.result.hlsURL,
-          mediaURL: job.result.mediaURL,
-          posterURL: job.result.posterURL,
-          hlsPrefix: job.result.hlsPrefix,
-        });
-      }
-
-      if (job.status === "failed") {
-        return res.status(500).json({
-          ok: false,
-          status: "failed",
-          error: job.error ?? "Video processing failed",
-        });
-      }
-
-      return res.json({
-        ok: true,
-        status: "pending",
-        jobId: job.jobId,
-      });
-    } catch (error) {
-      console.error("[uploads/process-video/status]", error);
-      res.status(500).json({
-        error: error.message ?? "Video job status failed",
-      });
-    }
-  }
-);
 
 /** @deprecated İstemci signed URL kullanmalı. Geriye dönük uyumluluk. */
 router.post("/uploads", verifyAuth, uploadRateLimit, async (req, res) => {

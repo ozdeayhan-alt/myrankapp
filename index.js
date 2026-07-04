@@ -31,7 +31,7 @@ const {
   checkStorageApi,
   checkMediaProxy,
 } = require("./src/lib/healthChecks");
-const { getRedisClient, getRedisStatus } = require("./src/lib/redis");
+const { getRedisClient, getRedisStatus, isRedisRequired, closeRedis } = require("./src/lib/redis");
 const rankingRoutes = require("./src/features/ranking/api/routes");
 const profileRoutes = require("./src/features/profile/api/routes");
 const uploadRoutes = require("./src/features/uploads/api/routes");
@@ -45,6 +45,7 @@ const blocksRoutes = require("./src/features/blocks/api/routes");
 const accountRoutes = require("./src/features/account/api/routes");
 const storiesRoutes = require("./src/features/stories/api/routes");
 const notificationsRoutes = require("./src/features/notifications/api/routes");
+const duelRoutes = require("./src/features/duel/api/routes");
 const { registerLegalRoutes } = require("./src/legal/routes");
 const {
   apiRateLimit,
@@ -158,11 +159,14 @@ app.get("/status", async (req, res) => {
       getCacheStats(),
     ]);
 
+    const redisOk = !isRedisRequired() || getRedisStatus() === "connected";
+
     const allOk =
       auth.status === "ok" &&
       firestore.status === "ok" &&
       storage.status === "ok" &&
-      mediaProxy.status === "ok";
+      mediaProxy.status === "ok" &&
+      redisOk;
 
     if (!isStatusDetailAuthorized(req)) {
       return res.json({
@@ -211,7 +215,42 @@ app.use("/api", blocksRoutes);
 app.use("/api", accountRoutes);
 app.use("/api", storiesRoutes);
 app.use("/api", notificationsRoutes);
+app.use("/api", duelRoutes);
 
-app.listen(PORT, () => {
-  console.log(`Sunucu http://localhost:${PORT} adresinde çalışıyor`);
+app.use((req, res) => {
+  res.status(404).json({ error: "Not found" });
+});
+
+app.use((err, req, res, next) => {
+  if (res.headersSent) {
+    return next(err);
+  }
+  console.error("[api] unhandled error:", err?.message ?? err);
+  res.status(500).json({ error: "Internal server error" });
+});
+
+const server = app.listen(PORT, () => {
+  if (process.env.NODE_ENV !== "production") {
+    console.log(`Sunucu http://localhost:${PORT} adresinde çalışıyor`);
+  }
+});
+
+function shutdown(signal) {
+  console.warn(`[api] ${signal} received — shutting down`);
+  server.close(() => {
+    void closeRedis().finally(() => process.exit(0));
+  });
+  setTimeout(() => process.exit(1), 15_000).unref();
+}
+
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
+
+process.on("unhandledRejection", (reason) => {
+  console.error("[api] unhandledRejection:", reason);
+});
+
+process.on("uncaughtException", (error) => {
+  console.error("[api] uncaughtException:", error?.message ?? error);
+  process.exit(1);
 });

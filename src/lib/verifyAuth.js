@@ -30,11 +30,25 @@ async function verifyAuth(req, res, next) {
     console.error("[verifyAuth]", code, message);
 
     if (code === "auth/argument-error") {
-      return res.status(401).json({ error: "Invalid token format" });
+      return res.status(401).json({ error: "Invalid token format", code });
     }
 
     if (code === "auth/id-token-expired") {
-      return res.status(401).json({ error: "Token expired" });
+      return res.status(401).json({ error: "Token expired", code });
+    }
+
+    if (code === "auth/id-token-revoked") {
+      return res.status(401).json({ error: "Token revoked", code });
+    }
+
+    if (
+      code === "auth/network-request-failed" ||
+      code === "auth/internal-error"
+    ) {
+      return res.status(503).json({
+        error: "Authentication service unavailable",
+        code,
+      });
     }
 
     if (code === "app/invalid-credential") {

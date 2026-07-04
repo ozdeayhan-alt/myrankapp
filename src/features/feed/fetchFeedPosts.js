@@ -1,5 +1,6 @@
 const { db } = require("../../lib/firestore");
 const { mapPostDoc } = require("./mapPostDoc");
+const { applyFeedContentTypeFilter } = require("./feedContentType");
 
 const DEFAULT_LIMIT = 15;
 
@@ -54,15 +55,23 @@ function buildPageResult(docs, pageSize, sortField) {
   };
 }
 
-async function fetchRecentFeedPage({ cursor, limit = DEFAULT_LIMIT }) {
+async function fetchRecentFeedPage({
+  cursor,
+  limit = DEFAULT_LIMIT,
+  feedContentType = "all",
+}) {
   const pageSize = Math.min(Math.max(Number(limit) || DEFAULT_LIMIT, 1), 50);
-  let query = db.collection("posts").orderBy("createdAt", "desc").limit(pageSize);
+  let query = applyFeedContentTypeFilter(db.collection("posts"), feedContentType);
+  query = query.orderBy("createdAt", "desc").limit(pageSize);
 
   const cursorInfo = decodeCursor(cursor);
   if (cursorInfo) {
     const startAfterDoc = await resolveStartAfter(cursorInfo);
     if (startAfterDoc) {
-      query = query.startAfter(startAfterDoc);
+      query = applyFeedContentTypeFilter(db.collection("posts"), feedContentType)
+        .orderBy("createdAt", "desc")
+        .startAfter(startAfterDoc)
+        .limit(pageSize);
     }
   }
 
@@ -75,6 +84,7 @@ async function fetchExploreFeedPage({
   filters,
   cursor,
   limit = DEFAULT_LIMIT,
+  feedContentType = "all",
 }) {
   const pageSize = Math.min(Math.max(Number(limit) || DEFAULT_LIMIT, 1), 50);
   let queryRef = db.collection("posts");
@@ -87,9 +97,7 @@ async function fetchExploreFeedPage({
     segmentKey && typeof segmentKey === "string" && segmentKey.trim().length > 0;
 
   if (hasSegmentKey) {
-    queryRef = queryRef
-      .where("segmentKey", "==", segmentKey.trim())
-      .orderBy(exploreOrderField, "desc");
+    queryRef = queryRef.where("segmentKey", "==", segmentKey.trim());
   } else if (metadataFilters) {
     if (metadataFilters.country?.trim()) {
       queryRef = queryRef.where(
@@ -125,18 +133,63 @@ async function fetchExploreFeedPage({
         metadataFilters.maritalStatus.trim()
       );
     }
-    queryRef = queryRef.orderBy(exploreOrderField, "desc");
-  } else {
-    queryRef = queryRef.orderBy(exploreOrderField, "desc");
   }
 
-  queryRef = queryRef.limit(pageSize);
+  queryRef = applyFeedContentTypeFilter(queryRef, feedContentType);
+  queryRef = queryRef.orderBy(exploreOrderField, "desc").limit(pageSize);
 
   const cursorInfo = decodeCursor(cursor);
   if (cursorInfo) {
     const startAfterDoc = await resolveStartAfter(cursorInfo);
     if (startAfterDoc) {
-      queryRef = queryRef.startAfter(startAfterDoc);
+      let pagedRef = db.collection("posts");
+      if (hasSegmentKey) {
+        pagedRef = pagedRef.where("segmentKey", "==", segmentKey.trim());
+      } else if (metadataFilters) {
+        if (metadataFilters.country?.trim()) {
+          pagedRef = pagedRef.where(
+            "metadata.country",
+            "==",
+            metadataFilters.country.trim()
+          );
+        }
+        if (metadataFilters.city?.trim()) {
+          pagedRef = pagedRef.where(
+            "metadata.city",
+            "==",
+            metadataFilters.city.trim()
+          );
+        }
+        if (metadataFilters.gender?.trim()) {
+          pagedRef = pagedRef.where(
+            "metadata.gender",
+            "==",
+            metadataFilters.gender.trim()
+          );
+        }
+        if (typeof metadataFilters.age === "number" && metadataFilters.age > 0) {
+          pagedRef = pagedRef.where("metadata.age", "==", metadataFilters.age);
+        }
+        if (metadataFilters.profession?.trim()) {
+          pagedRef = pagedRef.where(
+            "metadata.profession",
+            "==",
+            metadataFilters.profession.trim()
+          );
+        }
+        if (metadataFilters.maritalStatus?.trim()) {
+          pagedRef = pagedRef.where(
+            "metadata.maritalStatus",
+            "==",
+            metadataFilters.maritalStatus.trim()
+          );
+        }
+      }
+      pagedRef = applyFeedContentTypeFilter(pagedRef, feedContentType);
+      queryRef = pagedRef
+        .orderBy(exploreOrderField, "desc")
+        .startAfter(startAfterDoc)
+        .limit(pageSize);
     }
   }
 
@@ -205,10 +258,19 @@ function isBeforeCursor(doc, cursorMillis, cursorDocId) {
   return false;
 }
 
+function postMatchesFeedContentType(data, feedContentType) {
+  const slot = data.feedContentType ?? data.contentType;
+  if (feedContentType === "tweet" || feedContentType === "image") {
+    return slot === feedContentType;
+  }
+  return slot === "tweet" || slot === "image";
+}
+
 async function fetchFollowingFeedPageLegacy({
   userId,
   cursor,
   limit = DEFAULT_LIMIT,
+  feedContentType = "all",
 }) {
   const pageSize = Math.min(Math.max(Number(limit) || DEFAULT_LIMIT, 1), 50);
   const authorIds = await getFollowingAuthorIds(userId);
@@ -235,9 +297,11 @@ async function fetchFollowingFeedPageLegacy({
 
   await Promise.all(
     chunks.map(async (chunk) => {
-      const snap = await db
+      let chunkQuery = db
         .collection("posts")
-        .where("authorId", "in", chunk)
+        .where("authorId", "in", chunk);
+      chunkQuery = applyFeedContentTypeFilter(chunkQuery, feedContentType);
+      const snap = await chunkQuery
         .orderBy("createdAt", "desc")
         .limit(perChunkLimit)
         .get();
@@ -254,6 +318,7 @@ async function fetchFollowingFeedPageLegacy({
     .filter((doc) =>
       isBeforeCursor(doc, cursorMillis ?? Number.MAX_SAFE_INTEGER, cursorDocId)
     )
+    .filter((doc) => postMatchesFeedContentType(doc.data(), feedContentType))
     .sort(comparePostDocsDesc);
 
   const pageDocs = merged.slice(0, pageSize);
@@ -280,14 +345,15 @@ async function fetchFollowingFeedFromUserFeeds({
   userId,
   cursor,
   limit = DEFAULT_LIMIT,
+  feedContentType = "all",
 }) {
   const pageSize = Math.min(Math.max(Number(limit) || DEFAULT_LIMIT, 1), 50);
   let queryRef = db
     .collection("userFeeds")
     .doc(userId)
-    .collection("items")
-    .orderBy("createdAtMillis", "desc")
-    .limit(pageSize + 1);
+    .collection("items");
+  queryRef = applyFeedContentTypeFilter(queryRef, feedContentType);
+  queryRef = queryRef.orderBy("createdAtMillis", "desc").limit(pageSize + 1);
 
   const cursorInfo = decodeCursor(cursor);
   if (cursorInfo?.docId) {
@@ -298,10 +364,12 @@ async function fetchFollowingFeedFromUserFeeds({
       .doc(cursorInfo.docId)
       .get();
     if (cursorDoc.exists) {
-      queryRef = db
+      let pagedRef = db
         .collection("userFeeds")
         .doc(userId)
-        .collection("items")
+        .collection("items");
+      pagedRef = applyFeedContentTypeFilter(pagedRef, feedContentType);
+      queryRef = pagedRef
         .orderBy("createdAtMillis", "desc")
         .startAfter(cursorDoc)
         .limit(pageSize + 1);
@@ -355,11 +423,13 @@ async function fetchFollowingFeedPage({
   userId,
   cursor,
   limit = DEFAULT_LIMIT,
+  feedContentType = "all",
 }) {
   const userFeedPage = await fetchFollowingFeedFromUserFeeds({
     userId,
     cursor,
     limit,
+    feedContentType,
   });
 
   if (USE_USER_FEEDS_ONLY) {
@@ -370,13 +440,14 @@ async function fetchFollowingFeedPage({
     return userFeedPage;
   }
 
-  return fetchFollowingFeedPageLegacy({ userId, cursor, limit });
+  return fetchFollowingFeedPageLegacy({ userId, cursor, limit, feedContentType });
 }
 
 async function fetchAuthorFeedPage({
   authorId,
   cursor,
   limit = DEFAULT_LIMIT,
+  feedContentType = "all",
 }) {
   if (!authorId || typeof authorId !== "string") {
     return { posts: [], cursor: null, hasMore: false };
@@ -385,9 +456,9 @@ async function fetchAuthorFeedPage({
   const pageSize = Math.min(Math.max(Number(limit) || DEFAULT_LIMIT, 1), 50);
   let query = db
     .collection("posts")
-    .where("authorId", "==", authorId.trim())
-    .orderBy("createdAt", "desc")
-    .limit(pageSize);
+    .where("authorId", "==", authorId.trim());
+  query = applyFeedContentTypeFilter(query, feedContentType);
+  query = query.orderBy("createdAt", "desc").limit(pageSize);
 
   const cursorInfo = decodeCursor(cursor);
   if (cursorInfo) {
@@ -395,7 +466,9 @@ async function fetchAuthorFeedPage({
     if (startAfterDoc) {
       query = db
         .collection("posts")
-        .where("authorId", "==", authorId.trim())
+        .where("authorId", "==", authorId.trim());
+      query = applyFeedContentTypeFilter(query, feedContentType);
+      query = query
         .orderBy("createdAt", "desc")
         .startAfter(startAfterDoc)
         .limit(pageSize);

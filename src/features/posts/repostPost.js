@@ -4,6 +4,7 @@ const { buildSegmentKey, EMPTY_METADATA } = require("../../lib/segmentKey");
 const { applyInteraction } = require("../ranking/engine/applyInteraction");
 const { afterAuthorScoreChange } = require("../ranking/rankingScoreSync");
 const { invalidateFeedCachesForPost } = require("../feed/feedCache");
+const { resolveFeedContentType } = require("../feed/feedContentType");
 const { enqueueFanOut } = require("../../lib/jobQueue");
 const { PostError } = require("./postErrors");
 const { CAPTION_MAX_LENGTH } = require("./updatePostContent");
@@ -111,6 +112,10 @@ async function repostPost(originalPostId, actorId, caption) {
     : undefined;
 
   const originalSnapshot = buildOriginalSnapshot(original);
+  const feedContentType = resolveFeedContentType({
+    contentType: "repost",
+    originalSnapshot,
+  });
   const repostRef = db.collection("posts").doc();
 
   await repostRef.set({
@@ -126,6 +131,7 @@ async function repostPost(originalPostId, actorId, caption) {
     saveCount: 0,
     commentCount: 0,
     contentType: "repost",
+    feedContentType,
     originalPostId,
     repostCaption,
     originalSnapshot,

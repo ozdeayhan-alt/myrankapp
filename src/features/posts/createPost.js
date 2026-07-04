@@ -16,6 +16,7 @@ const {
 } = require("./parsePostContent");
 const { TWEET_MAX_LENGTH, CAPTION_MAX_LENGTH } = require("./updatePostContent");
 const { invalidateFeedCachesForPost } = require("../feed/feedCache");
+const { resolveFeedContentType } = require("../feed/feedContentType");
 const { enqueueFanOutDirect } = require("../../lib/jobQueue");
 
 const POST_CONTENT_TYPES = new Set(["tweet", "image", "video"]);
@@ -226,6 +227,7 @@ async function createPost(authorId, input = {}) {
     saveCount: 0,
     commentCount: 0,
     contentType,
+    feedContentType: resolveFeedContentType({ contentType }),
     content: trimmedContent,
     ...(hashtags.length > 0 ? { hashtags } : {}),
     ...(mentionUserIds.length > 0 ? { mentionUserIds } : {}),
@@ -243,6 +245,7 @@ async function createPost(authorId, input = {}) {
     postId: ref.id,
     authorId,
     createdAtMillis,
+    feedContentType: resolveFeedContentType({ contentType }),
   }).catch((error) => {
     console.error("[createPost] fan-out failed:", error.message ?? error);
   });

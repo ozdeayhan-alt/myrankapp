@@ -5,9 +5,11 @@ const { configureNetworkDns } = require("./src/lib/configureNetworkDns");
 configureNetworkDns();
 
 const { dequeueJob, processJob } = require("./src/lib/jobQueue");
-const { getRedisClient, getRedisStatus, isRedisRequired } = require("./src/lib/redis");
+const { getRedisClient, getRedisStatus, isRedisRequired, closeRedis } = require("./src/lib/redis");
 
 const IDLE_SLEEP_MS = Number(process.env.WORKER_IDLE_SLEEP_MS) || 1_000;
+
+let shuttingDown = false;
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -20,9 +22,11 @@ async function runWorkerLoop() {
     process.exit(1);
   }
 
-  console.log(`[worker] started redisStatus=${getRedisStatus()}`);
+  if (process.env.NODE_ENV !== "production") {
+    console.log(`[worker] started redisStatus=${getRedisStatus()}`);
+  }
 
-  while (true) {
+  while (!shuttingDown) {
     try {
       const job = await dequeueJob(5);
       if (!job) {
@@ -32,16 +36,32 @@ async function runWorkerLoop() {
 
       const startedAt = Date.now();
       const result = await processJob(job);
-      console.log(
-        `[worker] ${job.type} done in ${Date.now() - startedAt}ms`,
-        result
-      );
+      if (process.env.NODE_ENV !== "production") {
+        console.log(
+          `[worker] ${job.type} done in ${Date.now() - startedAt}ms`,
+          result
+        );
+      }
     } catch (error) {
       console.error("[worker] job failed:", error.message ?? error);
       await sleep(IDLE_SLEEP_MS);
     }
   }
 }
+
+function shutdown(signal) {
+  if (shuttingDown) {
+    return;
+  }
+  shuttingDown = true;
+  console.warn(`[worker] ${signal} received — stopping after current job`);
+  setTimeout(() => {
+    void closeRedis().finally(() => process.exit(0));
+  }, 500).unref();
+}
+
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
 
 runWorkerLoop().catch((error) => {
   console.error("[worker] fatal:", error.message ?? error);

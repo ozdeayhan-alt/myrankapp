@@ -248,6 +248,9 @@ async function applyInteraction({ postId, actorId, type, commentText }) {
     }
 
     return result;
+  }).then(async (result) => {
+    await invalidateEngagementCachesForUser(actorId);
+    return result;
   });
 }
 
@@ -263,6 +266,29 @@ async function getEngagementStatus({ postId, actorId }) {
 
 const MAX_BATCH_ENGAGEMENT = 50;
 
+const {
+  getCached,
+  setCached,
+  getCacheKey,
+  invalidateMatchingFeedCache,
+} = require("../../feed/feedCache");
+
+const ENGAGEMENT_CACHE_TTL_MS =
+  Number(process.env.ENGAGEMENT_CACHE_TTL_MS) || 120_000;
+
+function engagementCacheKey(actorId, postIds) {
+  const sorted = [...postIds].sort();
+  return getCacheKey(["engagements", actorId, sorted.join(",")]);
+}
+
+async function invalidateEngagementCachesForUser(userId) {
+  if (!userId) {
+    return;
+  }
+  const prefix = `engagements:${userId}:`;
+  await invalidateMatchingFeedCache((key) => key.startsWith(prefix));
+}
+
 async function getBatchEngagementStatus({ postIds, actorId }) {
   const uniqueIds = [...new Set(postIds.filter((id) => typeof id === "string" && id))].slice(
     0,
@@ -271,6 +297,14 @@ async function getBatchEngagementStatus({ postIds, actorId }) {
 
   if (uniqueIds.length === 0) {
     return {};
+  }
+
+  if (actorId) {
+    const cacheKey = engagementCacheKey(actorId, uniqueIds);
+    const cached = await getCached(cacheKey);
+    if (cached && typeof cached === "object") {
+      return cached;
+    }
   }
 
   const engagementRefs = uniqueIds.map((postId) =>
@@ -285,6 +319,14 @@ async function getBatchEngagementStatus({ postIds, actorId }) {
     engagements[postId] = buildEngagementFromDoc(eng);
   });
 
+  if (actorId) {
+    await setCached(
+      engagementCacheKey(actorId, uniqueIds),
+      engagements,
+      ENGAGEMENT_CACHE_TTL_MS
+    );
+  }
+
   return engagements;
 }
 
@@ -292,4 +334,5 @@ module.exports = {
   applyInteraction,
   getEngagementStatus,
   getBatchEngagementStatus,
+  invalidateEngagementCachesForUser,
 };

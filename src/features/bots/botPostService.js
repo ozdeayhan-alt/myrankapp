@@ -4,6 +4,7 @@ const { buildSegmentKey } = require("../../lib/segmentKey");
 const { postImageUrl } = require("./botPersonas");
 const { toDate } = require("./botUtils");
 const { invalidateFeedCachesForPost } = require("../feed/feedCache");
+const { resolveFeedContentType } = require("../feed/feedContentType");
 const { enqueueFanOutDirect } = require("../../lib/jobQueue");
 
 async function getUserPostContext(authorId) {
@@ -63,6 +64,7 @@ async function createBotPost({
     saveCount: 0,
     commentCount: 0,
     contentType,
+    feedContentType: resolveFeedContentType({ contentType }),
     content: trimmedContent,
     createdAt: createdAt
       ? Timestamp.fromDate(createdAt)
@@ -87,6 +89,7 @@ async function createBotPost({
     postId: ref.id,
     authorId: ctx.authorId,
     createdAtMillis,
+    feedContentType: resolveFeedContentType({ contentType }),
   }).catch((error) => {
     console.error("[createBotPost] fan-out failed:", error.message ?? error);
   });
