@@ -1,4 +1,5 @@
 const { CHARACTER_CONTENT_TYPES } = require("./characterContentTypes");
+const { extractNewsHint } = require("./characterNewsHint");
 
 function emojiForLevel(level) {
   if (level === "high") {
@@ -63,18 +64,20 @@ function buildTemplateWhisp(persona, contentType, seedText) {
 
 function buildNewsTemplateWhisp(persona, headlineHint) {
   const hint = String(headlineHint ?? "").trim();
+  const topic = extractNewsHint(hint, persona);
   const questions = [
     "Sence abartılıyor mu yoksa haklı mı?",
     "Bu sizi de etkiledi mi?",
     "Gerçekten bu kadar önemli mi sizce?",
     "Siz olsanız ne yapardınız?",
+    "Sence gerçekten parasını hak ediyor mu?",
   ];
   const q = questions[Math.floor(Math.random() * questions.length)];
-  const lines = [
-    "Gündemde dönen bir konu var.",
-    hint ? `Özellikle ${hint.slice(0, 60)} tarafı ilginç.` : null,
-    q,
-  ].filter(Boolean);
+
+  const lines = topic
+    ? [`${topic} yine konuşuluyor bugün.`, q]
+    : ["Gündemde yeni bir konu daha var.", q];
+
   return wrapWithVoice(persona, lines.join(" "));
 }
 

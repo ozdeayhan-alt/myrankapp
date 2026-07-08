@@ -8,10 +8,12 @@ set -euo pipefail
 PROJECT_DIR="${PROJECT_DIR:-/root/myrankapp}"
 CRON_MARKER="myrankapp-rebuild-rankings"
 PRUNE_MARKER="myrankapp-prune-push-tokens"
+CHARACTER_MARKER="myrankapp-character-jobs"
 CRON_TIMEZONE="Europe/Istanbul"
 SERVER_TIMEZONE="Etc/UTC"
 SCHEDULE="0 0 * * *"
 PRUNE_SCHEDULE="0 3 * * 0"
+CHARACTER_SCHEDULE="*/20 * * * *"
 
 NODE_BIN="$(command -v node || true)"
 if [[ -z "$NODE_BIN" || ! -x "$NODE_BIN" ]]; then
@@ -52,9 +54,11 @@ fi
 CRON_LINE="${SCHEDULE} cd ${PROJECT_DIR} && ${NODE_BIN} scripts/rebuild-rankings.js >> ${LOG_FILE} 2>&1 # ${CRON_MARKER}"
 PRUNE_LOG="$LOG_DIR/prune-push-tokens.log"
 PRUNE_LINE="${PRUNE_SCHEDULE} cd ${PROJECT_DIR} && ${NODE_BIN} scripts/prune-push-tokens.js --all >> ${PRUNE_LOG} 2>&1 # ${PRUNE_MARKER}"
+CHARACTER_LOG="$LOG_DIR/character-jobs.log"
+CHARACTER_LINE="${CHARACTER_SCHEDULE} cd ${PROJECT_DIR} && ${NODE_BIN} scripts/run-character-jobs.js >> ${CHARACTER_LOG} 2>&1 # ${CHARACTER_MARKER}"
 
 EXISTING="$(crontab -l 2>/dev/null || true)"
-FILTERED="$(echo "$EXISTING" | grep -v "${CRON_MARKER}" | grep -v "${PRUNE_MARKER}" | grep -v '^CRON_TZ=' | grep -v '^[[:space:]]*$' || true)"
+FILTERED="$(echo "$EXISTING" | grep -v "${CRON_MARKER}" | grep -v "${PRUNE_MARKER}" | grep -v "${CHARACTER_MARKER}" | grep -v '^CRON_TZ=' | grep -v '^[[:space:]]*$' || true)"
 
 {
   echo "$FILTERED"
@@ -62,6 +66,7 @@ FILTERED="$(echo "$EXISTING" | grep -v "${CRON_MARKER}" | grep -v "${PRUNE_MARKE
   echo "$CRON_LINE"
   echo "CRON_TZ=${SERVER_TIMEZONE}"
   echo "$PRUNE_LINE"
+  echo "$CHARACTER_LINE"
 } | crontab -
 
 echo ""
@@ -72,7 +77,7 @@ echo "  Log:    $LOG_FILE"
 echo "  Saat:   Her gün 00:00 (Europe/Istanbul)"
 echo ""
 echo "Mevcut crontab:"
-crontab -l | grep -E "${CRON_MARKER}|${PRUNE_MARKER}|^CRON_TZ=" || true
+crontab -l | grep -E "${CRON_MARKER}|${PRUNE_MARKER}|${CHARACTER_MARKER}|^CRON_TZ=" || true
 echo ""
 echo "Manuel test:"
 echo "  cd ${PROJECT_DIR} && npm run rebuild-rankings"

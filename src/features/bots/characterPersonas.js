@@ -59,12 +59,12 @@ const CHARACTER_PERSONAS = [
     ],
     rssFeeds: [
       {
-        url: "https://www.espn.com/espn/rss/soccer/news",
-        label: "espn-soccer",
-      },
-      {
         url: "https://feeds.bbci.co.uk/sport/football/rss.xml",
         label: "bbc-football",
+      },
+      {
+        url: "https://www.goal.com/feeds/en/news",
+        label: "goal",
       },
     ],
     voice: {
@@ -111,7 +111,7 @@ const CHARACTER_PERSONAS = [
     trendKeywords: ["gta", "playstation", "xbox", "nintendo", "steam", "oyun"],
     rssFeeds: [
       { url: "https://feeds.ign.com/ign/games-all", label: "ign" },
-      { url: "https://www.polygon.com/rss/index.xml", label: "polygon" },
+      { url: "https://www.pcgamer.com/rss/", label: "pcgamer" },
     ],
     voice: {
       emojiLevel: "medium",
@@ -245,8 +245,8 @@ const CHARACTER_PERSONAS = [
     trendKeywords: ["tatil", "uçak", "otel", "avrupa", "gezi", "seyahat"],
     rssFeeds: [
       {
-        url: "https://www.lonelyplanet.com/news/feed",
-        label: "lonely-planet",
+        url: "https://feeds.bbci.co.uk/travel/rss.xml",
+        label: "bbc-travel",
       },
     ],
     voice: {
