@@ -18,6 +18,7 @@
     "seed-character-bots": "node scripts/seed-character-bots.js",
     "seed-bot-stories": "node scripts/seed-bot-stories.js",
     "run-bot-jobs": "node scripts/run-bot-jobs.js",
+    "run-character-jobs": "node scripts/run-character-jobs.js",
     "backfill-display-name-lower": "node scripts/backfill-display-name-lower.js",
     "backfill-photo-urls": "node scripts/backfill-photo-urls.js",
     "repair-profile-photos": "node scripts/repair-profile-photos.js",
