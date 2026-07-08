@@ -1,7 +1,7 @@
 const { FieldValue } = require("firebase-admin/firestore");
 const { db } = require("../../lib/firestore");
 const { CHARACTER_PERSONAS } = require("./characterPersonas");
-const { randomInt } = require("./botUtils");
+const { randomInt, toDate } = require("./botUtils");
 
 const SCHEDULE_COLLECTION = "characterSchedule";
 const DAILY_QUOTA_COLLECTION = "characterDailyQuota";
@@ -247,7 +247,7 @@ async function markSlotPosted({ dateKey, characterUid, slotIndex, postId }) {
     ...slots[slotIndex],
     posted: true,
     postId: postId ?? null,
-    postedAt: FieldValue.serverTimestamp(),
+    postedAt: new Date().toISOString(),
   };
 
   await ref.update({ slots });
@@ -261,6 +261,73 @@ async function markSlotPosted({ dateKey, characterUid, slotIndex, postId }) {
   );
 
   return true;
+}
+
+/** Bugünkü slotlar post atıldı ama işaretlenmediyse (eski hata) toparla. */
+async function recoverUnmarkedSlots(dateKey = todayKey()) {
+  let recovered = 0;
+
+  for (const persona of CHARACTER_PERSONAS) {
+    const ref = scheduleRef(dateKey, persona.uid);
+    const snap = await ref.get();
+    if (!snap.exists) {
+      continue;
+    }
+
+    const slots = Array.isArray(snap.data().slots) ? [...snap.data().slots] : [];
+    const postsSnap = await db
+      .collection("posts")
+      .where("authorId", "==", persona.uid)
+      .orderBy("createdAt", "desc")
+      .limit(15)
+      .get();
+
+    const posts = postsSnap.docs
+      .map((doc) => ({
+        id: doc.id,
+        at: toDate(doc.data().createdAt),
+      }))
+      .filter((post) => post.at);
+
+    let changed = false;
+    const usedPostIds = new Set(
+      slots.filter((slot) => slot.posted && slot.postId).map((slot) => slot.postId)
+    );
+
+    for (let index = 0; index < slots.length; index += 1) {
+      const slot = slots[index];
+      if (slot.posted) {
+        continue;
+      }
+      const slotAt = new Date(slot.at);
+      if (Number.isNaN(slotAt.getTime()) || slotAt > new Date()) {
+        continue;
+      }
+
+      const match = posts.find(
+        (post) => !usedPostIds.has(post.id) && post.at >= slotAt
+      );
+      if (!match) {
+        continue;
+      }
+
+      slots[index] = {
+        ...slot,
+        posted: true,
+        postId: match.id,
+        postedAt: match.at.toISOString(),
+      };
+      usedPostIds.add(match.id);
+      changed = true;
+      recovered += 1;
+    }
+
+    if (changed) {
+      await ref.update({ slots });
+    }
+  }
+
+  return recovered;
 }
 
 module.exports = {
@@ -279,4 +346,5 @@ module.exports = {
   ensureDailySchedules,
   listDueSlots,
   markSlotPosted,
+  recoverUnmarkedSlots,
 };

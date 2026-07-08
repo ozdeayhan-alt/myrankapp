@@ -1,7 +1,6 @@
 const { FieldValue } = require("firebase-admin/firestore");
 const { db } = require("../../lib/firestore");
 const { buildSegmentKey, isMetadataComplete, getRankingSegmentKeys } = require("../../lib/segmentKey");
-const { ensureAuthUser, syncPublicProfile } = require("./botUserService");
 const { createBotPost } = require("./botPostService");
 const {
   SEGMENT_BOT_COUNT,
@@ -51,6 +50,7 @@ async function upsertSegmentBotUser(persona, segmentKey) {
 
   await userRef.set(payload, { merge: true });
 
+  const { syncPublicProfile } = require("./botUserService");
   await syncPublicProfile(persona.uid, {
     displayName: persona.displayName,
     photoURL,
@@ -129,6 +129,7 @@ async function seedSegmentBots(metadata) {
   const botIds = [];
 
   try {
+    const { ensureAuthUser } = require("./botUserService");
     for (const persona of personas) {
       await ensureAuthUser({
         uid: persona.uid,

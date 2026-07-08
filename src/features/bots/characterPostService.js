@@ -3,6 +3,7 @@ const {
   ensureDailySchedules,
   listDueSlots,
   markSlotPosted,
+  recoverUnmarkedSlots,
 } = require("./characterScheduler");
 const { composeAndPublishCharacterWhisp } = require("./characterCompose");
 
@@ -12,6 +13,10 @@ async function processDueCharacterPosts(now = new Date()) {
   }
 
   await ensureDailySchedules(now);
+  const recovered = await recoverUnmarkedSlots();
+  if (recovered > 0) {
+    console.log(`[characterPostService] recovered ${recovered} unmarked slots`);
+  }
   const dueSlots = await listDueSlots(now);
   const processed = [];
 
