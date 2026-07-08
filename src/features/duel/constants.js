@@ -9,7 +9,12 @@ const MAX_DUEL_DELTA_PER_MATCH =
 const DUEL_MATCH_POOL_SIZE =
   Number(process.env.DUEL_MATCH_POOL_SIZE) || 24;
 
+/** Bot Glow posts merged into duel candidate pool. */
+const DUEL_BOT_GLOW_POOL_SIZE =
+  Number(process.env.DUEL_BOT_GLOW_POOL_SIZE) || 20;
+
 module.exports = {
   MAX_DUEL_DELTA_PER_MATCH,
   DUEL_MATCH_POOL_SIZE,
+  DUEL_BOT_GLOW_POOL_SIZE,
 };
