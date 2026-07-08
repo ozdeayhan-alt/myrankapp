@@ -7,12 +7,14 @@ const {
 const { buildSegmentKey } = require("../../lib/segmentKey");
 const { ensureUserRankingEntries } = require("../profile/ensureUserRankingEntries");
 const {
-  BOT_PERSONAS,
+  CHARACTER_PERSONAS,
+  CHARACTER_BOT_ROLE,
   BIO_CATEGORY_VISIBILITY,
   buildMetadata,
   buildBio,
   avatarUrl,
-} = require("./botPersonas");
+} = require("./characterPersonas");
+const { BOT_PERSONAS } = require("./botPersonas");
 const { randomInt } = require("./botUtils");
 
 async function syncPublicProfile(userId, data) {
@@ -94,7 +96,7 @@ async function ensureAuthUser(persona) {
   return { created: true };
 }
 
-async function upsertBotUser(persona, { initialScore } = {}) {
+async function upsertBotUser(persona, { initialScore, botRole = "community" } = {}) {
   const metadata = buildMetadata(persona);
   const bio = buildBio(persona);
   const photoURL = avatarUrl(persona);
@@ -115,7 +117,7 @@ async function upsertBotUser(persona, { initialScore } = {}) {
     bioCategoryVisibility: BIO_CATEGORY_VISIBILITY,
     metadata,
     isBot: true,
-    botRole: "community",
+    botRole,
     totalScore,
     updatedAt: now,
   };
@@ -131,10 +133,10 @@ async function upsertBotUser(persona, { initialScore } = {}) {
     photoURL,
     bio,
     bioCategoryVisibility: BIO_CATEGORY_VISIBILITY,
-    metadata: persona.metadata,
-    totalScore: persona.totalScore,
+    metadata,
+    totalScore,
     isBot: true,
-    botRole: "community",
+    botRole,
   });
 
   await ensureUserRankingEntries(persona.uid);
@@ -146,6 +148,24 @@ async function upsertBotUser(persona, { initialScore } = {}) {
     segmentKey: buildSegmentKey(metadata),
     created: !existing.exists,
   };
+}
+
+async function upsertCharacterBotUser(persona, options = {}) {
+  return upsertBotUser(persona, {
+    ...options,
+    botRole: CHARACTER_BOT_ROLE,
+    initialScore: options.initialScore ?? randomInt(80, 220),
+  });
+}
+
+async function seedAllCharacterBotUsers() {
+  const results = [];
+  for (const persona of CHARACTER_PERSONAS) {
+    await ensureAuthUser(persona);
+    const result = await upsertCharacterBotUser(persona);
+    results.push(result);
+  }
+  return results;
 }
 
 async function seedAllBotUsers() {
@@ -167,7 +187,9 @@ async function isBotAccount(userId) {
 
 module.exports = {
   seedAllBotUsers,
+  seedAllCharacterBotUsers,
   upsertBotUser,
+  upsertCharacterBotUser,
   syncPublicProfile,
   isBotAccount,
   ensureAuthUser,
