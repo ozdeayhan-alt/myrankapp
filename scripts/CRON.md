@@ -98,6 +98,38 @@ npm run run-bot-jobs
 0 */6 * * * cd /root/myrankapp && /usr/bin/node scripts/run-bot-jobs.js >> /root/myrankapp/logs/bot-jobs.log 2>&1 # myrankapp-bot-jobs
 ```
 
+## Karakter içerik sistemi (tartışma başlatıcı Whisp)
+
+İlk kurulum (10 karakter hesabı):
+
+```bash
+cd /root/myrankapp
+npm run seed-character-bots
+```
+
+Periyodik job (vadesi gelen slotlar → Whisp):
+
+```bash
+npm run run-character-jobs
+```
+
+Önerilen crontab (20 dakikada bir):
+
+```cron
+*/20 * * * * cd /root/myrankapp && /usr/bin/node scripts/run-character-jobs.js >> /root/myrankapp/logs/character-jobs.log 2>&1 # myrankapp-character-jobs
+```
+
+### Ortam değişkenleri
+
+| Değişken | Varsayılan | Açıklama |
+|----------|------------|----------|
+| `CHARACTER_POSTS_ENABLED` | `1` (açık) | `0` veya `false` ile kapat |
+| `CHARACTER_AI_ENABLED` | AI key varsa açık | `0` ile sadece şablon/banka |
+| `OPENAI_API_KEY` | — | AI rewrite için |
+| `CHARACTER_AI_MODEL` | `gpt-4o-mini` | OpenAI model adı |
+
+Karakter hesapları yorumlara cevap vermez; sadece Whisp paylaşır (`botRole: character`).
+
 ## Gereksinimler
 
 - `/root/myrankapp/.env` (Firebase / proje ayarları)
