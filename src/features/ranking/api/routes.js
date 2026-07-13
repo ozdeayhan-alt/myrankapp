@@ -304,7 +304,7 @@ router.post("/story-votes/batch", verifyAuth, voteRateLimit, async (req, res) =>
 
 router.post("/interactions", verifyAuth, async (req, res) => {
   try {
-    const { postId, type, commentText } = req.body;
+    const { postId, type, commentText, parentCommentId } = req.body;
 
     if (!postId || !type) {
       return res.status(400).json({ error: "postId and type are required" });
@@ -327,23 +327,28 @@ router.post("/interactions", verifyAuth, async (req, res) => {
       actorId: req.user.uid,
       type,
       commentText,
+      parentCommentId,
     });
 
     afterAuthorScoreChange(result.authorId, result.scoreDelta);
 
     const actorId = req.user.uid;
-    if (result.authorId && result.authorId !== actorId) {
+    if (type === "comment" && Array.isArray(result.notifyRecipientIds)) {
+      for (const recipientId of result.notifyRecipientIds) {
+        if (recipientId && recipientId !== actorId) {
+          fireNotification(
+            notifyPostInteraction({
+              authorId: recipientId,
+              actorId,
+              postId,
+              type: "comment",
+            })
+          );
+        }
+      }
+    } else if (result.authorId && result.authorId !== actorId) {
       const { engagement, firstAction } = result;
-      if (type === "comment") {
-        fireNotification(
-          notifyPostInteraction({
-            authorId: result.authorId,
-            actorId,
-            postId,
-            type: "comment",
-          })
-        );
-      } else if (type === "save" && engagement?.saved && firstAction) {
+      if (type === "save" && engagement?.saved && firstAction) {
         fireNotification(
           notifyPostInteraction({
             authorId: result.authorId,

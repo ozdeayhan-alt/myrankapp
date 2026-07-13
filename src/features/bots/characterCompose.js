@@ -9,8 +9,10 @@ const {
 const { fetchNewsForPersona } = require("./characterNewsIngest");
 const { filterUnseenNewsItems, markNewsSeen, passesTitleOverlapGate } = require("./characterNewsStore");
 const { pickBestNewsItem } = require("./characterNewsRank");
+const { containsEnglishSentence } = require("./characterNewsHint");
 const { buildTemplateWhisp, buildNewsTemplateWhisp } = require("./characterTemplates");
 const { rewriteWithAi } = require("./characterVoiceRewrite");
+const { resolveCharacterLink } = require("./characterLink");
 const { createBotPost } = require("./botPostService");
 
 function pickContentTypeForNormalSlot() {
@@ -26,16 +28,21 @@ function pickContentTypeForNormalSlot() {
 
 function passesWhispGate(text, sourceTitle = "") {
   const trimmed = String(text ?? "").trim();
-  if (!trimmed || trimmed.length > TWEET_MAX_LENGTH) {
+  if (!trimmed || trimmed.length < 50 || trimmed.length > TWEET_MAX_LENGTH) {
     return false;
   }
-  if (!trimmed.includes("?")) {
+  const sentenceCount = trimmed.split(/[.!?]+/).filter((part) => part.trim().length > 6)
+    .length;
+  if (sentenceCount < 2 && trimmed.length < 90) {
     return false;
   }
   if (/https?:\/\//i.test(trimmed)) {
     return false;
   }
   if (/kaynak:|haberin özeti|son dakika/i.test(trimmed)) {
+    return false;
+  }
+  if (containsEnglishSentence(trimmed)) {
     return false;
   }
   if (sourceTitle && !passesTitleOverlapGate(trimmed, sourceTitle)) {
@@ -109,7 +116,7 @@ async function buildWhispText({ persona, contentType, slotType }) {
 
   if (!text) {
     if (newsItem) {
-      text = buildNewsTemplateWhisp(persona, newsItem.title);
+      text = buildNewsTemplateWhisp(persona, newsItem);
       source = { ...source, kind: CHARACTER_SOURCE_KINDS.TEMPLATE };
     } else {
       text = buildTemplateWhisp(persona, resolvedType, seedText);
@@ -119,7 +126,7 @@ async function buildWhispText({ persona, contentType, slotType }) {
 
   if (!passesWhispGate(text, newsItem?.title ?? "")) {
     if (newsItem) {
-      text = buildNewsTemplateWhisp(persona, newsItem.title);
+      text = buildNewsTemplateWhisp(persona, newsItem);
     } else {
       text = buildTemplateWhisp(persona, resolvedType, seedText);
     }
@@ -131,6 +138,10 @@ async function buildWhispText({ persona, contentType, slotType }) {
     contentType: resolvedType,
     source,
     newsItem,
+    link: resolveCharacterLink({
+      contentType: resolvedType,
+      newsItem,
+    }),
   };
 }
 
@@ -154,6 +165,8 @@ async function composeAndPublishCharacterWhisp({
     authorId: persona.uid,
     contentType: "tweet",
     content: composed.text,
+    linkUrl: composed.link?.linkUrl,
+    linkTitle: composed.link?.linkTitle,
   });
 
   if (composed.newsItem?.hash) {
@@ -173,6 +186,7 @@ async function composeAndPublishCharacterWhisp({
     contentType: composed.contentType,
     source: composed.source,
     text: composed.text,
+    linkUrl: composed.link?.linkUrl ?? null,
   };
 }
 

@@ -15,15 +15,48 @@ const {
   extractMentionTokens,
 } = require("./parsePostContent");
 const { TWEET_MAX_LENGTH, CAPTION_MAX_LENGTH } = require("./updatePostContent");
+const { normalizeWhispLinkFields } = require("./normalizeWhispLink");
+const { unfurlLink } = require("./unfurlLink");
 const { invalidateFeedCachesForPost } = require("../feed/feedCache");
 const { resolveFeedContentType } = require("../feed/feedContentType");
+const { normalizeFlowFields } = require("../flow/normalizeFlowFields");
 const { enqueueFanOutDirect } = require("../../lib/jobQueue");
 
-const POST_CONTENT_TYPES = new Set(["tweet", "image", "video"]);
+const POST_CONTENT_TYPES = new Set(["tweet", "image", "video", "flow"]);
 const DEFAULT_VIDEO_WIDTH = 1280;
 const DEFAULT_VIDEO_HEIGHT = 720;
 const DEFAULT_IMAGE_WIDTH = 1080;
 const DEFAULT_IMAGE_HEIGHT = 1080;
+
+async function resolveWhispLinkFields(contentType, input) {
+  const fields = normalizeWhispLinkFields(contentType, input);
+  if (!fields.linkUrl) {
+    return fields;
+  }
+
+  const needsTitle = !fields.linkTitle;
+  const needsDescription = !fields.linkDescription;
+  const needsImage = !fields.linkImageUrl;
+  if (!needsTitle && !needsDescription && !needsImage) {
+    return fields;
+  }
+
+  const preview = await unfurlLink(fields.linkUrl);
+  const merged = {
+    linkUrl: fields.linkUrl,
+    ...(fields.linkTitle ?? preview.linkTitle
+      ? { linkTitle: fields.linkTitle ?? preview.linkTitle }
+      : {}),
+    ...(fields.linkDescription ?? preview.linkDescription
+      ? { linkDescription: fields.linkDescription ?? preview.linkDescription }
+      : {}),
+    ...(fields.linkImageUrl ?? preview.linkImageUrl
+      ? { linkImageUrl: fields.linkImageUrl ?? preview.linkImageUrl }
+      : {}),
+  };
+
+  return merged;
+}
 
 function mapUserMetadata(userData) {
   const metadata = userData?.metadata;
@@ -64,6 +97,16 @@ function normalizeCreateContent(contentType, content) {
       throw new PostError(
         400,
         `Tweet en fazla ${TWEET_MAX_LENGTH} karakter olabilir`
+      );
+    }
+    return trimmed;
+  }
+
+  if (contentType === "flow") {
+    if (trimmed.length > CAPTION_MAX_LENGTH) {
+      throw new PostError(
+        400,
+        `Flow yorumu en fazla ${CAPTION_MAX_LENGTH} karakter olabilir`
       );
     }
     return trimmed;
@@ -176,8 +219,15 @@ async function createPost(authorId, input = {}) {
   let mediaURL;
   let hlsURL;
   let posterURL;
+  let flowFields = {};
 
-  if (contentType === "image" || contentType === "video") {
+  if (contentType === "flow") {
+    if (input.mediaURL || input.hlsURL || input.posterURL) {
+      throw new PostError(400, "Flow paylaşımlarında medya yüklemesi kullanılamaz");
+    }
+
+    flowFields = await normalizeFlowFields(input);
+  } else if (contentType === "image" || contentType === "video") {
     mediaURL = assertAuthorPostMediaURL(input.mediaURL, authorId, "mediaURL");
   } else if (input.mediaURL) {
     throw new PostError(400, "Tweet gönderilerinde mediaURL kullanılamaz");
@@ -213,6 +263,7 @@ async function createPost(authorId, input = {}) {
   }
 
   const mediaDimensions = resolveMediaDimensions(contentType, input);
+  const linkFields = await resolveWhispLinkFields(contentType, input);
 
   const payload = {
     authorId,
@@ -234,7 +285,9 @@ async function createPost(authorId, input = {}) {
     ...(mediaURL ? { mediaURL } : {}),
     ...(hlsURL ? { hlsURL } : {}),
     ...(posterURL ? { posterURL } : {}),
+    ...linkFields,
     ...mediaDimensions,
+    ...flowFields,
     createdAt: FieldValue.serverTimestamp(),
   };
 
@@ -250,7 +303,7 @@ async function createPost(authorId, input = {}) {
     console.error("[createPost] fan-out failed:", error.message ?? error);
   });
 
-  await invalidateFeedCachesForPost({
+  void invalidateFeedCachesForPost({
     authorId,
     segmentKey,
     hashtags,

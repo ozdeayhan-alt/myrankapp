@@ -30,8 +30,9 @@ describe("parseFeedContentTypeQuery", () => {
     assert.equal(parseFeedContentTypeQuery("all"), "all");
   });
 
-  it("maps whisp and glow", () => {
+  it("maps whisp, glow and flow", () => {
     assert.equal(parseFeedContentTypeQuery("whisp"), "tweet");
     assert.equal(parseFeedContentTypeQuery("glow"), "image");
+    assert.equal(parseFeedContentTypeQuery("flow"), "flow");
   });
 });

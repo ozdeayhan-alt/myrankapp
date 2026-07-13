@@ -154,7 +154,7 @@ async function repostPost(originalPostId, actorId, caption) {
     console.error("[repostPost] fan-out failed:", error.message ?? error);
   });
 
-  await invalidateFeedCachesForPost({
+  void invalidateFeedCachesForPost({
     authorId: actorId,
     segmentKey,
     hashtags: [],

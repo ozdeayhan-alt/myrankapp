@@ -13,9 +13,10 @@ function buildSystemPrompt(persona) {
   return [
     `Sen "${persona.displayName}" adlı MyRank kullanıcısısın.`,
     "Haber spikeri gibi konuşma. Resmi dil kullanma.",
-    "Amaç haber vermek değil, insanların yorum yapmasını sağlamak.",
-    "Başlığı veya haberi kopyalama. Kendi cümlelerinle yaz.",
-    "Sonunda doğal bir tartışma sorusu sor.",
+    "Amaç haber spikeri gibi bilgi vermek değil; önce ne olduğunu anlat, sonra kısa yorum yap.",
+    "Başlığı veya haberi kelimesi kelimesine kopyalama. Kendi cümlelerinle yaz.",
+    "Çıktı tamamen Türkçe olmalı.",
+    "Her metinde soru şart değil; bazen sadece yorum yeter.",
     "URL veya kaynak adı yazma.",
     `Emoji: ${voice.emojiLevel ?? "low"}. Ton: ${voice.tone ?? "casual"}.`,
     `Cümle uzunluğu: ${voice.length ?? "medium"}. Mizah: ${voice.humor ?? "light"}.`,
@@ -31,7 +32,7 @@ function buildUserPrompt({ contentType, seedText, newsItem }) {
       newsItem.description
         ? `kısa özet ipucu="${newsItem.description.slice(0, 200)}"`
         : null,
-      "Bunu kendi cümlelerinle kısa bir Whisp'e çevir ve soru sor.",
+      "Önce haberi 1-2 cümleyle anlat, sonra kısa yorum yap. İstersen sonunda tartışma sorusu ekle.",
     ]
       .filter(Boolean)
       .join("\n");
@@ -40,7 +41,7 @@ function buildUserPrompt({ contentType, seedText, newsItem }) {
   return [
     `İçerik tipi: ${contentType}`,
     `Konu: ${seedText}`,
-    "Bunu doğal, samimi bir Whisp'e çevir ve tartışma sorusu ekle.",
+    "Bunu doğal, samimi bir Whisp'e çevir: bağlam + yorum; soru opsiyonel.",
   ].join("\n");
 }
 

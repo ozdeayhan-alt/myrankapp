@@ -1,7 +1,11 @@
 const { FieldValue } = require("firebase-admin/firestore");
 const { db } = require("../../lib/firestore");
-const { BOT_PERSONAS, WEEKLY_POST_TEMPLATES } = require("./botPersonas");
-const { daysBetween, toDate, randomInt } = require("./botUtils");
+const { BOT_PERSONAS } = require("./botPersonas");
+const {
+  pickWeeklyWhisp,
+  isBotWeeklySlotToday,
+} = require("./botWhispBank");
+const { daysBetween, toDate } = require("./botUtils");
 const { isBotAccount } = require("./botUserService");
 const { createBotPost, findLatestPostId } = require("./botPostService");
 const { botLikePost, botLikeBonus99 } = require("./botInteractionService");
@@ -17,29 +21,29 @@ async function processWeeklyPosts() {
   const results = [];
 
   for (const persona of BOT_PERSONAS) {
+    if (!isBotWeeklySlotToday(persona.uid)) {
+      continue;
+    }
+
     const stateRef = weeklyStateRef(persona.uid);
     const stateSnap = await stateRef.get();
-    const lastPostAt = stateSnap.exists
-      ? toDate(stateSnap.data().lastPostAt)
-      : null;
+    const state = stateSnap.exists ? stateSnap.data() : {};
+    const lastPostAt = toDate(state.lastPostAt);
 
     if (lastPostAt && daysBetween(new Date(), lastPostAt) < 6.5) {
       continue;
     }
 
-    const template =
-      WEEKLY_POST_TEMPLATES[
-        randomInt(0, WEEKLY_POST_TEMPLATES.length - 1)
-      ];
-    const mediaSeed = template.mediaSeed
-      ? `${persona.uid}-${template.mediaSeed}-${Date.now()}`
+    const picked = pickWeeklyWhisp(persona.uid, state.lastBankIndex ?? null);
+    const mediaSeed = picked.mediaSeed
+      ? `${persona.uid}-${picked.mediaSeed}-${Date.now()}`
       : undefined;
 
     try {
       const postId = await createBotPost({
         authorId: persona.uid,
-        contentType: template.contentType,
-        content: template.content,
+        contentType: picked.contentType,
+        content: picked.content,
         mediaSeed,
       });
 
@@ -47,6 +51,7 @@ async function processWeeklyPosts() {
         {
           lastPostAt: FieldValue.serverTimestamp(),
           lastPostId: postId,
+          lastBankIndex: picked.bankIndex,
           updatedAt: FieldValue.serverTimestamp(),
         },
         { merge: true }

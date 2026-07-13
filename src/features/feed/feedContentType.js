@@ -1,5 +1,5 @@
 /** Firestore values stored on posts / userFeeds items. */
-const FEED_CONTENT_TYPES = new Set(["tweet", "image", "video"]);
+const FEED_CONTENT_TYPES = new Set(["tweet", "image", "video", "flow"]);
 
 /**
  * Resolves the feed slot type used for server-side pagination.
@@ -12,7 +12,12 @@ function resolveFeedContentType(data) {
 
   if (data.contentType === "repost") {
     const snapshotType = data.originalSnapshot?.contentType;
-    if (snapshotType === "image" || snapshotType === "video" || snapshotType === "tweet") {
+    if (
+      snapshotType === "image" ||
+      snapshotType === "video" ||
+      snapshotType === "tweet" ||
+      snapshotType === "flow"
+    ) {
       return snapshotType;
     }
     return "tweet";
@@ -24,7 +29,7 @@ function resolveFeedContentType(data) {
 
 /**
  * Parses API query param. Default `all`. Accepts whisp/glow and legacy tweet/image.
- * @returns {'all' | 'tweet' | 'image'}
+ * @returns {'all' | 'tweet' | 'image' | 'flow'}
  */
 function parseFeedContentTypeQuery(raw) {
   if (raw == null || raw === "") {
@@ -41,17 +46,24 @@ function parseFeedContentTypeQuery(raw) {
   if (normalized === "glow" || normalized === "image") {
     return "image";
   }
+  if (normalized === "flow") {
+    return "flow";
+  }
 
   return "all";
 }
 
 /** Applies feed content filter to a Firestore query ref (equality / in). */
 function applyFeedContentTypeFilter(queryRef, feedContentType) {
-  if (feedContentType === "tweet" || feedContentType === "image") {
+  if (
+    feedContentType === "tweet" ||
+    feedContentType === "image" ||
+    feedContentType === "flow"
+  ) {
     return queryRef.where("feedContentType", "==", feedContentType);
   }
 
-  return queryRef.where("feedContentType", "in", ["tweet", "image"]);
+  return queryRef.where("feedContentType", "in", ["tweet", "image", "flow"]);
 }
 
 module.exports = {

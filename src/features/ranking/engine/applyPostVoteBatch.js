@@ -169,8 +169,8 @@ async function applyPostVoteBatch({ actorId, postId, delta: rawDelta }) {
       counts,
       engagement: buildEngagementFromEng(eng, voteNet),
     };
-  }).then(async (result) => {
-    await invalidateEngagementCachesForUser(actorId);
+  }).then((result) => {
+    void invalidateEngagementCachesForUser(actorId);
     return result;
   });
 }

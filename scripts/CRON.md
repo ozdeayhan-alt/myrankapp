@@ -100,7 +100,7 @@ npm run run-bot-jobs
 
 ## Karakter içerik sistemi (tartışma başlatıcı Whisp)
 
-İlk kurulum (10 karakter hesabı):
+İlk kurulum (11 karakter hesabı):
 
 ```bash
 cd /root/myrankapp
@@ -127,6 +127,17 @@ npm run run-character-jobs
 | `CHARACTER_AI_ENABLED` | AI key varsa açık | `0` ile sadece şablon/banka |
 | `OPENAI_API_KEY` | — | AI rewrite için |
 | `CHARACTER_AI_MODEL` | `gpt-4o-mini` | OpenAI model adı |
+| `CHARACTER_LINK_CHANCE` | `0.25` | Haber Whisp'lerinde kaynak linki ekleme olasılığı |
+| `CHARACTER_FLOW_ENABLED` | karakter post açıksa açık | `0` ile günlük Flow kapat |
+| `YOUTUBE_API_KEY` | — | Opsiyonel; yoksa curated TR kanal RSS/HTML kullanılır |
+
+Karakter Flow kaynakları yalnızca Türkiye YouTube kanallarıdır (`characterYoutubeChannels.js`).
+
+Günlük Flow (karakter başına en fazla 1): `run-character-jobs` içinde otomatik. Bugüne özel tek sefer:
+
+```bash
+npm run run-character-flows-today
+```
 
 Karakter hesapları yorumlara cevap vermez; sadece Whisp paylaşır (`botRole: character`).
 

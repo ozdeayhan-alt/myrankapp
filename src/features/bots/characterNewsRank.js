@@ -1,4 +1,5 @@
 const { normalizeTitle } = require("./characterNewsDedupe");
+const { looksMostlyTurkish, looksMostlyEnglish } = require("./characterNewsHint");
 
 function scoreNewsItem(item, persona, feedIndex = 0) {
   const keywords = Array.isArray(persona.trendKeywords)
@@ -32,7 +33,15 @@ function scoreNewsItem(item, persona, feedIndex = 0) {
     }
   }
 
-  return keywordScore + recencyBonus + publishedBonus;
+  let languageBonus = 0;
+  if (looksMostlyTurkish(item.title)) {
+    languageBonus += 6;
+  }
+  if (looksMostlyEnglish(item.title)) {
+    languageBonus -= 8;
+  }
+
+  return keywordScore + recencyBonus + publishedBonus + languageBonus;
 }
 
 function rankNewsItems(items, persona) {

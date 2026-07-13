@@ -15,6 +15,7 @@ const {
 const {
   processSegmentBotWeeklyPosts,
 } = require("../src/features/bots/segmentBotWeeklyService");
+const { runCronJobScript } = require("./lib/shutdownCronJob");
 
 async function main() {
   console.log("[bot-jobs] Welcome queue...");
@@ -42,7 +43,4 @@ async function main() {
   console.log("[bot-jobs] Done.");
 }
 
-main().catch((err) => {
-  console.error("[bot-jobs] Failed:", err);
-  process.exit(1);
-});
+void runCronJobScript("bot-jobs", main);

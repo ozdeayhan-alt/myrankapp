@@ -15,6 +15,8 @@ const { enqueueFanOut } = require("../../../lib/jobQueue");
 const { fetchPostById } = require("../../profile/fetchProfileSummary");
 const { fetchPostComments } = require("../fetchPostComments");
 const { invalidateFeedCachesForPost } = require("../../feed/feedCache");
+const { unfurlLink } = require("../unfurlLink");
+const { PostError } = require("../postErrors");
 
 const router = express.Router();
 router.use(writeRateLimit);
@@ -65,7 +67,7 @@ router.post("/posts/:postId/fan-out", verifyAuth, async (req, res) => {
     }
 
     const fanOut = await enqueueFanOut(postId);
-    await invalidateFeedCachesForPost({
+    void invalidateFeedCachesForPost({
       authorId: post.authorId,
       segmentKey: post.segmentKey,
       hashtags: [],
@@ -74,6 +76,27 @@ router.post("/posts/:postId/fan-out", verifyAuth, async (req, res) => {
     res.json({ ok: true, ...fanOut });
   } catch (error) {
     res.status(500).json({ error: error.message ?? "Fan-out failed" });
+  }
+});
+
+router.post("/links/preview", verifyAuth, async (req, res) => {
+  try {
+    const { url } = req.body ?? {};
+    if (!url || !String(url).trim()) {
+      return res.status(400).json({ error: "url is required" });
+    }
+
+    const preview = await unfurlLink(url);
+    if (!preview.linkUrl) {
+      return res.status(400).json({ error: "Geçersiz link" });
+    }
+
+    res.json({ ok: true, preview });
+  } catch (error) {
+    if (error instanceof PostError) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
+    res.status(500).json({ error: error.message ?? "Link önizlemesi alınamadı" });
   }
 });
 

@@ -11,6 +11,17 @@ function mapCommentDoc(id, data) {
     actorId: data.actorId ? String(data.actorId) : "",
     commentText: data.commentText ? String(data.commentText) : "",
     createdAt: createdAt ? createdAt.toISOString() : new Date().toISOString(),
+    parentCommentId: data.parentCommentId
+      ? String(data.parentCommentId)
+      : undefined,
+    replyToActorId: data.replyToActorId
+      ? String(data.replyToActorId)
+      : undefined,
+    replyToDisplayName:
+      typeof data.replyToDisplayName === "string" &&
+      data.replyToDisplayName.trim()
+        ? data.replyToDisplayName.trim()
+        : undefined,
     actorDisplayName:
       typeof data.actorDisplayName === "string" && data.actorDisplayName.trim()
         ? data.actorDisplayName.trim()

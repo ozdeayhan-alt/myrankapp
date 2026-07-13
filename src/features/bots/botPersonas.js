@@ -11,9 +11,9 @@ const BOT_PERSONAS = [
     avatarIndex: 11,
     bio: "Kitap ve sabah kahvesi.",
     initialPost: {
-      contentType: "image",
-      content: "İzmir'de güzel bir sabah ☀️ Herkese iyi haftalar!",
-      mediaSeed: "bot01-morning",
+      contentType: "tweet",
+      content:
+        "Sabah zilinden önce iki yudum kahve. İzmir'de öğretmenlik böyle başlıyor.",
     },
   },
   {
@@ -29,7 +29,7 @@ const BOT_PERSONAS = [
     initialPost: {
       contentType: "tweet",
       content:
-        "Sınav haftası ama motivasyon yüksek 📚 MyRank'te ilk günüm, merhaba herkese!",
+        "Kütüphanede herkes kulaklık takmış. Final haftası böyle görünüyor.",
     },
   },
   {
@@ -43,9 +43,9 @@ const BOT_PERSONAS = [
     avatarIndex: 33,
     bio: "Sahil yürüyüşü olmadan gün başlamaz.",
     initialPost: {
-      contentType: "image",
-      content: "Sahilden kısa bir mola. Bazen durmak da üretmektir.",
-      mediaSeed: "bot03-sea",
+      contentType: "tweet",
+      content:
+        "Sahilde mail açmadım. Mühendislikte en zor özellik bazen kapatmak.",
     },
   },
   {
@@ -60,7 +60,7 @@ const BOT_PERSONAS = [
     bio: "Nöbet sonrası kısa notlar.",
     initialPost: {
       contentType: "tweet",
-      content: "Gece nöbetinden sonra kahve ve kısa bir paylaşım ☕",
+      content: "Nöbet çıkışı: ayakkabılar hâlâ ayakta, ben değilim.",
     },
   },
   {
@@ -74,9 +74,8 @@ const BOT_PERSONAS = [
     avatarIndex: 55,
     bio: "Mutfağı seviyorum.",
     initialPost: {
-      contentType: "image",
-      content: "Ev yapımı börek günü 🥐 Kimseye kıyamam.",
-      mediaSeed: "bot05-food",
+      contentType: "tweet",
+      content: "Hamur mayalandı, ev de biraz. Mutfak bugün dürüst bir yer.",
     },
   },
   {
@@ -92,7 +91,7 @@ const BOT_PERSONAS = [
     initialPost: {
       contentType: "tweet",
       content:
-        "Yeni bir paragraf, yeni bir nefes. İstanbul geceleri yazmaya devam.",
+        "Bir paragraf yazıp sildim. Silmek de yazmanın parçası; kimse bunu övmez.",
     },
   },
   {
@@ -106,9 +105,8 @@ const BOT_PERSONAS = [
     avatarIndex: 22,
     bio: "Kampüs, kod, kahve.",
     initialPost: {
-      contentType: "image",
-      content: "Kampüsten manzara. Bugün iyi hissediyorum.",
-      mediaSeed: "bot07-campus",
+      contentType: "tweet",
+      content: "Kampüste Wi‑Fi düştü. Panik, sonra sabır. Sonra yine kod.",
     },
   },
   {
@@ -123,7 +121,8 @@ const BOT_PERSONAS = [
     bio: "Detaylara takılırım.",
     initialPost: {
       contentType: "tweet",
-      content: "Proje teslimi yaklaşıyor. Odak modu: açık.",
+      content:
+        "Sprint sonunda 'neredeyse bitti' tehlikeli bir cümle. Neredeyse çoğu zaman yarım.",
     },
   },
   {
@@ -137,9 +136,9 @@ const BOT_PERSONAS = [
     avatarIndex: 44,
     bio: "Adalet ve düzen.",
     initialPost: {
-      contentType: "image",
-      content: "Boğaz hattında kısa yürüyüşten bir kare.",
-      mediaSeed: "bot09-bosphorus",
+      contentType: "tweet",
+      content:
+        "Duruşma öncesi dosyayı üçüncü kez okudum. Tekrar abartı değil; önlem.",
     },
   },
   {
@@ -154,7 +153,8 @@ const BOT_PERSONAS = [
     bio: "Sınıftan selamlar.",
     initialPost: {
       contentType: "tweet",
-      content: "Yeni haftaya pozitif başlangıç. Herkese başarılar!",
+      content:
+        "Yanlış cevap gelince sınıf güldü. Gülmeyi kesip dinledik. Ders orada başladı.",
     },
   },
 ];
@@ -169,22 +169,6 @@ const BIO_CATEGORY_VISIBILITY = {
   profession: true,
   maritalStatus: true,
 };
-
-const WEEKLY_POST_TEMPLATES = [
-  {
-    contentType: "tweet",
-    content: "Haftanın ortasından kısa bir not: küçük adımlar birikir.",
-  },
-  {
-    contentType: "image",
-    content: "Bu hafta favori köşemden bir kare.",
-    mediaSeed: "weekly-corner",
-  },
-  {
-    contentType: "tweet",
-    content: "Bugün minik bir hedef: bir paylaşım, bir teşekkür.",
-  },
-];
 
 function buildMetadata(persona) {
   return {
@@ -215,7 +199,6 @@ module.exports = {
   BOT_PERSONAS,
   BOT_UID_SET,
   BIO_CATEGORY_VISIBILITY,
-  WEEKLY_POST_TEMPLATES,
   buildMetadata,
   buildBio,
   avatarUrl,

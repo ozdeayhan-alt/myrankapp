@@ -100,7 +100,13 @@ function applyAuthorScoreUpdate(
 /**
  * Etkileşim -> atomic DB update (interaction + post + user.totalScore)
  */
-async function applyInteraction({ postId, actorId, type, commentText }) {
+async function applyInteraction({
+  postId,
+  actorId,
+  type,
+  commentText,
+  parentCommentId,
+}) {
   if (!COUNT_FIELD[type]) {
     throw new Error(`Invalid interaction type: ${type}`);
   }
@@ -108,9 +114,17 @@ async function applyInteraction({ postId, actorId, type, commentText }) {
   const actorProfile =
     type === "comment" ? await resolveUserPublic(actorId) : null;
 
+  const normalizedParentId =
+    typeof parentCommentId === "string" && parentCommentId.trim()
+      ? parentCommentId.trim()
+      : null;
+
   const postRef = db.collection("posts").doc(postId);
   const interactionRef =
     type === "comment" ? db.collection("interactions").doc() : null;
+  const parentRef = normalizedParentId
+    ? db.collection("interactions").doc(normalizedParentId)
+    : null;
 
   return db.runTransaction(async (transaction) => {
     const postSnap = await transaction.get(postRef);
@@ -120,6 +134,25 @@ async function applyInteraction({ postId, actorId, type, commentText }) {
 
     const post = postSnap.data();
     const authorId = post.authorId;
+    let parentComment = null;
+
+    if (type === "comment" && normalizedParentId && parentRef) {
+      const parentSnap = await transaction.get(parentRef);
+      if (!parentSnap.exists) {
+        throw new Error("Yanıtlanan yorum bulunamadı");
+      }
+      parentComment = parentSnap.data();
+      if (
+        parentComment.type !== "comment" ||
+        parentComment.postId !== postId
+      ) {
+        throw new Error("Geçersiz üst yorum");
+      }
+      if (parentComment.parentCommentId) {
+        throw new Error("Yanıtlara yanıt verilemez");
+      }
+    }
+
     const userRef = db.collection("users").doc(authorId);
     const userSnap = await transaction.get(userRef);
     const engRef = db.collection("actorEngagements").doc(actorDocId(actorId, postId));
@@ -210,6 +243,16 @@ async function applyInteraction({ postId, actorId, type, commentText }) {
       if (actorProfile?.photoURL) {
         interactionData.actorPhotoURL = actorProfile.photoURL;
       }
+      if (normalizedParentId && parentComment) {
+        interactionData.parentCommentId = normalizedParentId;
+        interactionData.replyToActorId = parentComment.actorId
+          ? String(parentComment.actorId)
+          : "";
+        if (parentComment.actorDisplayName?.trim()) {
+          interactionData.replyToDisplayName =
+            parentComment.actorDisplayName.trim();
+        }
+      }
       transaction.set(interactionRef, interactionData);
     }
 
@@ -244,12 +287,32 @@ async function applyInteraction({ postId, actorId, type, commentText }) {
         createdAt: new Date().toISOString(),
         actorDisplayName: actorProfile?.displayName ?? "",
         actorPhotoURL: actorProfile?.photoURL ?? "",
+        ...(normalizedParentId ? { parentCommentId: normalizedParentId } : {}),
+        ...(parentComment?.actorId
+          ? { replyToActorId: String(parentComment.actorId) }
+          : {}),
+        ...(parentComment?.actorDisplayName?.trim()
+          ? { replyToDisplayName: parentComment.actorDisplayName.trim() }
+          : {}),
       };
+
+      const notifyRecipientIds = new Set();
+      if (authorId !== actorId) {
+        notifyRecipientIds.add(authorId);
+      }
+      if (
+        parentComment?.actorId &&
+        parentComment.actorId !== actorId &&
+        parentComment.actorId !== authorId
+      ) {
+        notifyRecipientIds.add(String(parentComment.actorId));
+      }
+      result.notifyRecipientIds = [...notifyRecipientIds];
     }
 
     return result;
-  }).then(async (result) => {
-    await invalidateEngagementCachesForUser(actorId);
+  }).then((result) => {
+    void invalidateEngagementCachesForUser(actorId);
     return result;
   });
 }

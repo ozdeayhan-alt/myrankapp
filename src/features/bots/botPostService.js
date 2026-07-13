@@ -6,6 +6,7 @@ const { toDate } = require("./botUtils");
 const { invalidateFeedCachesForPost } = require("../feed/feedCache");
 const { resolveFeedContentType } = require("../feed/feedContentType");
 const { enqueueFanOutDirect } = require("../../lib/jobQueue");
+const { normalizeWhispLinkFields } = require("../posts/normalizeWhispLink");
 
 async function getUserPostContext(authorId) {
   const userSnap = await db.collection("users").doc(authorId).get();
@@ -48,9 +49,19 @@ async function createBotPost({
   content,
   mediaSeed,
   createdAt,
+  linkUrl,
+  linkTitle,
+  providerUrl,
 }) {
   const ctx = await getUserPostContext(authorId);
   const trimmedContent = String(content ?? "").trim();
+  const linkFields = normalizeWhispLinkFields(contentType, { linkUrl, linkTitle });
+
+  let flowFields = {};
+  if (contentType === "flow") {
+    const { normalizeFlowFields } = require("../flow/normalizeFlowFields");
+    flowFields = await normalizeFlowFields({ providerUrl });
+  }
 
   const payload = {
     authorId: ctx.authorId,
@@ -66,6 +77,8 @@ async function createBotPost({
     contentType,
     feedContentType: resolveFeedContentType({ contentType }),
     content: trimmedContent,
+    ...linkFields,
+    ...flowFields,
     createdAt: createdAt
       ? Timestamp.fromDate(createdAt)
       : FieldValue.serverTimestamp(),

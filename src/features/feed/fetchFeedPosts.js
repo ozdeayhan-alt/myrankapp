@@ -260,10 +260,14 @@ function isBeforeCursor(doc, cursorMillis, cursorDocId) {
 
 function postMatchesFeedContentType(data, feedContentType) {
   const slot = data.feedContentType ?? data.contentType;
-  if (feedContentType === "tweet" || feedContentType === "image") {
+  if (
+    feedContentType === "tweet" ||
+    feedContentType === "image" ||
+    feedContentType === "flow"
+  ) {
     return slot === feedContentType;
   }
-  return slot === "tweet" || slot === "image";
+  return slot === "tweet" || slot === "image" || slot === "flow";
 }
 
 async function fetchFollowingFeedPageLegacy({

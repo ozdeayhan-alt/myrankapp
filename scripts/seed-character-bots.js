@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Create/update 10 character bots (botRole: character).
+ * Create/update 11 character bots (botRole: character).
  *
  * Usage: node scripts/seed-character-bots.js
  */

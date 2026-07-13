@@ -38,14 +38,16 @@ async function deletePost(postId, userId) {
       throw new PostError(404, "Gönderi bulunamadı");
     }
 
+    const userRef = db.collection("users").doc(authorId);
+    const userSnap =
+      postScore !== 0 ? await transaction.get(userRef) : null;
+
     transaction.delete(ref);
 
     if (postScore === 0) {
       return;
     }
 
-    const userRef = db.collection("users").doc(authorId);
-    const userSnap = await transaction.get(userRef);
     const oldTotalScore = userSnap.exists
       ? (userSnap.data().totalScore ?? 0)
       : 0;
@@ -69,7 +71,7 @@ async function deletePost(postId, userId) {
 
   await removePostFromUserFeeds(postId);
 
-  await invalidateFeedCachesForPost({
+  void invalidateFeedCachesForPost({
     authorId,
     segmentKey: data.segmentKey,
     hashtags: Array.isArray(data.hashtags) ? data.hashtags : [],

@@ -26,10 +26,12 @@ const CHARACTER_PERSONAS = [
       "ai",
       "tesla",
       "microsoft",
+      "telefon",
+      "teknoloji",
     ],
     rssFeeds: [
-      { url: "https://feeds.arstechnica.com/arstechnica/index", label: "arstechnica" },
-      { url: "https://www.theverge.com/rss/index.xml", label: "theverge" },
+      { url: "https://shiftdelete.net/feed", label: "shiftdelete" },
+      { url: "https://www.donanimhaber.com/rss/tum/", label: "donanimhaber" },
     ],
     voice: {
       emojiLevel: "medium",
@@ -58,14 +60,8 @@ const CHARACTER_PERSONAS = [
       "ronaldo",
     ],
     rssFeeds: [
-      {
-        url: "https://feeds.bbci.co.uk/sport/football/rss.xml",
-        label: "bbc-football",
-      },
-      {
-        url: "https://www.goal.com/feeds/en/news",
-        label: "goal",
-      },
+      { url: "https://www.ahaber.com.tr/rss/spor.xml", label: "ahaber-spor" },
+      { url: "https://www.sabah.com.tr/rss/spor.xml", label: "sabah-spor" },
     ],
     voice: {
       emojiLevel: "high",
@@ -84,12 +80,10 @@ const CHARACTER_PERSONAS = [
     age: 34,
     avatarIndex: 25,
     bio: "Motor sesi ve yol hikâyeleri.",
-    trendKeywords: ["tesla", "bmw", "mercedes", "elektrikli", "otomobil", "suv"],
+    trendKeywords: ["tesla", "bmw", "mercedes", "elektrikli", "otomobil", "suv", "araba"],
     rssFeeds: [
-      {
-        url: "https://www.autoblog.com/rss.xml",
-        label: "autoblog",
-      },
+      { url: "https://www.otohaber.com.tr/feed/", label: "otohaber" },
+      { url: "https://www.otopark.com/feed/", label: "otopark" },
     ],
     voice: {
       emojiLevel: "low",
@@ -108,10 +102,10 @@ const CHARACTER_PERSONAS = [
     age: 24,
     avatarIndex: 28,
     bio: "Rank climb arası Whisp atarım.",
-    trendKeywords: ["gta", "playstation", "xbox", "nintendo", "steam", "oyun"],
+    trendKeywords: ["gta", "playstation", "xbox", "nintendo", "steam", "oyun", "espor"],
     rssFeeds: [
-      { url: "https://feeds.ign.com/ign/games-all", label: "ign" },
-      { url: "https://www.pcgamer.com/rss/", label: "pcgamer" },
+      { url: "https://www.turunculevye.com/feed", label: "turunculevye" },
+      { url: "https://www.indir.com/haber/feed", label: "indir" },
     ],
     voice: {
       emojiLevel: "medium",
@@ -130,12 +124,10 @@ const CHARACTER_PERSONAS = [
     age: 21,
     avatarIndex: 31,
     bio: "Spoiler vermem, tartışırım.",
-    trendKeywords: ["netflix", "dizi", "film", "oscar", "marvel", "disney"],
+    trendKeywords: ["netflix", "dizi", "film", "oscar", "marvel", "disney", "sinema"],
     rssFeeds: [
-      {
-        url: "https://variety.com/feed/",
-        label: "variety",
-      },
+      { url: "https://www.sabah.com.tr/rss/kultur-sanat.xml", label: "sabah-kultur" },
+      { url: "https://www.log.com.tr/feed/", label: "log" },
     ],
     voice: {
       emojiLevel: "low",
@@ -164,10 +156,8 @@ const CHARACTER_PERSONAS = [
       "llm",
     ],
     rssFeeds: [
-      {
-        url: "https://www.technologyreview.com/feed/",
-        label: "mit-tech-review",
-      },
+      { url: "https://webrazzi.com/feed", label: "webrazzi" },
+      { url: "https://shiftdelete.net/feed", label: "shiftdelete" },
     ],
     voice: {
       emojiLevel: "low",
@@ -186,12 +176,9 @@ const CHARACTER_PERSONAS = [
     age: 29,
     avatarIndex: 41,
     bio: "Merak etmek serbest.",
-    trendKeywords: ["uzay", "nasa", "bilim", "keşif", "mars", "gen"],
+    trendKeywords: ["uzay", "nasa", "bilim", "keşif", "mars", "gen", "araştırma"],
     rssFeeds: [
-      {
-        url: "https://www.sciencedaily.com/rss/all.xml",
-        label: "sciencedaily",
-      },
+      { url: "https://evrimagaci.org/rss.xml", label: "evrimagaci" },
     ],
     voice: {
       emojiLevel: "low",
@@ -220,10 +207,8 @@ const CHARACTER_PERSONAS = [
       "ekonomi",
     ],
     rssFeeds: [
-      {
-        url: "https://feeds.bbci.co.uk/news/business/rss.xml",
-        label: "bbc-business",
-      },
+      { url: "https://www.bloomberght.com/rss", label: "bloomberght" },
+      { url: "https://www.dunya.com/rss", label: "dunya" },
     ],
     voice: {
       emojiLevel: "low",
@@ -244,10 +229,8 @@ const CHARACTER_PERSONAS = [
     bio: "Valiz açık, soru hazır.",
     trendKeywords: ["tatil", "uçak", "otel", "avrupa", "gezi", "seyahat"],
     rssFeeds: [
-      {
-        url: "https://feeds.bbci.co.uk/travel/rss.xml",
-        label: "bbc-travel",
-      },
+      { url: "https://www.hurriyet.com.tr/rss/seyahat", label: "hurriyet-seyahat" },
+      { url: "https://www.ntv.com.tr/seyahat.rss", label: "ntv-seyahat" },
     ],
     voice: {
       emojiLevel: "high",
@@ -275,15 +258,46 @@ const CHARACTER_PERSONAS = [
       "gündem",
     ],
     rssFeeds: [
-      {
-        url: "https://feeds.bbci.co.uk/news/world/rss.xml",
-        label: "bbc-world",
-      },
+      { url: "https://www.ntv.com.tr/gundem.rss", label: "ntv-gundem" },
+      { url: "https://www.cnnturk.com/feed/rss/turkiye/news", label: "cnnturk" },
     ],
     voice: {
       emojiLevel: "low",
       tone: "casual",
       length: "short",
+      humor: "light",
+    },
+  },
+  {
+    uid: "bot_char_11",
+    displayName: "Edebiyat Sever",
+    gender: "Kadın",
+    city: "İstanbul",
+    maritalStatus: "Bekar",
+    profession: "Edebiyat Öğretmeni",
+    age: 32,
+    avatarIndex: 55,
+    bio: "Yeni çıkan kitapları okur, uzun uzun yorumlarım.",
+    trendKeywords: [
+      "kitap",
+      "roman",
+      "yazar",
+      "edebiyat",
+      "ödül",
+      "bestseller",
+      "çeviri",
+      "yayınevi",
+      "okuma",
+      "yayın",
+    ],
+    rssFeeds: [
+      { url: "https://www.hurriyet.com.tr/rss/kelebek", label: "hurriyet-kelebek" },
+      { url: "https://www.sabah.com.tr/rss/kultur-sanat.xml", label: "sabah-kultur" },
+    ],
+    voice: {
+      emojiLevel: "low",
+      tone: "reflective",
+      length: "long",
       humor: "light",
     },
   },
